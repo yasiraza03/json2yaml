@@ -1,0 +1,26 @@
+orderId: 8f14e45f-ceea-467a-9b7e-1f3e8a2c1d00
+createdAt: '2026-11-23T12:27:00Z'
+customer:
+  name: Ayesha Khan
+  email: ayesha@example.com
+  vip: true
+items:
+  - sku: KB-101
+    qty: 2
+    price: 49.99
+    tags:
+      - keyboard
+      - usb
+  - sku: MS-7
+    qty: 1
+    price: 19.5
+    tags: []
+    note: null
+shipping:
+  method: express
+  address: |-
+    12 Mall Road
+    Lahore
+    54000
+notes: 'yes'
+version: '1.10'

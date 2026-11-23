@@ -1,0 +1,39 @@
+{
+  "name": "jsonyaml",
+  "version": "1.0.0",
+  "description": "Zero-dependency JSON to YAML converter with JSON Schema inference and validation (CLI, library and web app).",
+  "main": "src/jsonyaml.js",
+  "bin": {
+    "json2yaml": "bin/json2yaml.js"
+  },
+  "files": [
+    "src",
+    "bin",
+    "web/index.html",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "build:web": "node scripts/build-web.js",
+    "test:e2e": "node scripts/build-web.js && node test/e2e/web.e2e.js"
+  },
+  "keywords": [
+    "json",
+    "yaml",
+    "converter",
+    "json-schema",
+    "schema",
+    "validator",
+    "cli"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=16"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0",
+    "ajv-draft-04": "^1.0.0",
+    "js-yaml": "^4.3.2",
+    "yaml": "^2.9.1"
+  }
+}

@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JSON → YAML Converter &amp; Schema Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f12;
+    --panel: #14171c;
+    --panel-2: #1a1e25;
+    --line: #262b34;
+    --line-2: #323844;
+    --text: #e4e6ea;
+    --muted: #8a92a0;
+    --faint: #5b6270;
+    --accent: #f2b544;
+    --accent-ink: #1b1405;
+    --ok: #5fd08f;
+    --err: #ff6b6b;
+    --warn: #f2b544;
+    --t-key: #8ab4ff;
+    --t-str: #b7e08a;
+    --t-num: #f7a76c;
+    --t-kw: #d49cff;
+    --t-punct: #6f7887;
+    --t-block: #e9d38a;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f2ee; --panel: #fffdf9; --panel-2: #f8f6f1; --line: #e3dfd6; --line-2: #d3cec2;
+      --text: #1d1f23; --muted: #646a74; --faint: #9aa0a9; --accent: #c98a12; --accent-ink: #fff;
+      --ok: #1f9d5a; --err: #d63b3b; --warn: #b7791f;
+      --t-key: #2559c7; --t-str: #3f7d1f; --t-num: #b8520f; --t-kw: #8a3fc4; --t-punct: #8b919b; --t-block: #8a6d0f;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text); font: 14px/1.45 var(--sans);
+    display: flex; flex-direction: column; min-height: 100vh;
+  }
+  button, select, input { font: inherit; color: inherit; }
+
+  header {
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    padding: 14px 20px 12px; border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+  .brand h1 { font: 600 17px/1 var(--mono); margin: 0; letter-spacing: -0.02em; }
+  .brand h1 .arrow { color: var(--accent); }
+  .brand span { color: var(--muted); font-size: 12.5px; }
+
+  .seg { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 3px; gap: 2px; }
+  .seg button {
+    border: 0; background: transparent; padding: 6px 13px; border-radius: 6px; cursor: pointer;
+    color: var(--muted); font-weight: 500; font-size: 13px;
+  }
+  .seg button:hover { color: var(--text); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+  .toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+    padding: 10px 20px; border-bottom: 1px solid var(--line); background: var(--panel-2);
+    font-size: 12.5px; color: var(--muted);
+  }
+  .toolbar .group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+  .toolbar .sep { width: 1px; height: 18px; background: var(--line-2); }
+  .toolbar label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
+  .toolbar select, .toolbar input[type="text"] {
+    background: var(--panel); border: 1px solid var(--line-2); border-radius: 6px; padding: 3px 6px; font-size: 12.5px;
+  }
+  .toolbar input[type="text"] { width: 120px; }
+  .toolbar input[type="checkbox"] { accent-color: var(--accent); margin: 0; }
+  [hidden] { display: none !important; }
+
+  main {
+    flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 14px 20px; min-height: 0;
+  }
+  .pane {
+    display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+  }
+  .stack { display: grid; grid-template-rows: 1fr 1fr; gap: 14px; min-height: 0; }
+  .pane-head {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px;
+    border-bottom: 1px solid var(--line); min-height: 42px;
+  }
+  .pane-head h2 { font: 600 11.5px/1 var(--sans); text-transform: uppercase; letter-spacing: 0.08em; margin: 0; color: var(--muted); }
+  .pane-head .meta { color: var(--faint); font: 12px var(--mono); margin-left: 6px; }
+  .pane-head .actions { margin-left: auto; display: flex; gap: 6px; }
+  .btn {
+    border: 1px solid var(--line-2); background: var(--panel-2); border-radius: 6px; padding: 4px 10px;
+    font-size: 12.5px; cursor: pointer; color: var(--text); white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--faint); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .btn:disabled { opacity: .45; cursor: default; }
+
+  .editor { position: relative; flex: 1; display: flex; min-height: 0; }
+  .gutter {
+    flex: none; width: 48px; padding: 12px 8px 12px 0; text-align: right; overflow: hidden;
+    color: var(--faint); font: 13px/20px var(--mono); user-select: none; border-right: 1px solid var(--line);
+    white-space: pre; background: var(--panel-2);
+  }
+  .gutter .bad { color: var(--err); font-weight: 600; }
+  textarea {
+    flex: 1; resize: none; border: 0; outline: none; background: transparent; color: var(--text);
+    font: 13px/20px var(--mono); padding: 12px 14px; white-space: pre; overflow: auto; tab-size: 2;
+  }
+  textarea::placeholder { color: var(--faint); }
+  .editor.drag { outline: 2px dashed var(--accent); outline-offset: -6px; }
+
+  .output { flex: 1; overflow: auto; min-height: 0; }
+  pre.code {
+    margin: 0; padding: 12px 14px 12px 0; font: 13px/20px var(--mono); counter-reset: ln; min-width: max-content;
+  }
+  pre.code .l { display: block; padding-left: 62px; position: relative; white-space: pre; min-height: 20px; }
+  pre.code .l::before {
+    counter-increment: ln; content: counter(ln); position: absolute; left: 0; width: 48px; padding-right: 8px;
+    text-align: right; color: var(--faint); border-right: 1px solid var(--line); background: var(--panel-2);
+  }
+  pre.code.plain { padding-left: 14px; white-space: pre; }
+  .t-key { color: var(--t-key); }
+  .t-str { color: var(--t-str); }
+  .t-num { color: var(--t-num); }
+  .t-kw { color: var(--t-kw); }
+  .t-punct { color: var(--t-punct); }
+  .t-block { color: var(--t-block); }
+  .t-qkey { color: var(--t-key); font-style: italic; }
+
+  .errbox { padding: 18px; }
+  .errbox h3 { margin: 0 0 6px; color: var(--err); font-size: 14px; }
+  .errbox p { margin: 0 0 12px; color: var(--muted); }
+  .errbox pre { margin: 0; padding: 12px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; font: 12.5px/1.5 var(--mono); overflow: auto; }
+  .errbox .btn { margin-top: 12px; }
+
+  .results { padding: 6px 0; }
+  .verdict { display: flex; align-items: center; gap: 10px; padding: 12px 16px; font-weight: 600; }
+  .verdict.ok { color: var(--ok); }
+  .verdict.bad { color: var(--err); }
+  .verdict .dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+  .issue {
+    display: grid; grid-template-columns: minmax(90px, auto) 1fr auto; gap: 12px; align-items: baseline;
+    padding: 8px 16px; border-top: 1px solid var(--line); cursor: pointer; width: 100%; text-align: left;
+    background: transparent; border-left: 0; border-right: 0; border-bottom: 0;
+  }
+  .issue:hover { background: var(--panel-2); }
+  .issue code { font: 12.5px var(--mono); color: var(--t-key); word-break: break-all; }
+  .issue .msg { color: var(--text); }
+  .issue .kw { font: 11.5px var(--mono); color: var(--faint); }
+  .doc-label { padding: 10px 16px 4px; color: var(--muted); font: 600 11.5px var(--sans); text-transform: uppercase; letter-spacing: .06em; }
+
+  footer.status {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 8px 20px 12px; font: 12px var(--mono); color: var(--muted);
+  }
+  .pill { display: inline-flex; align-items: center; gap: 6px; }
+  .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+  .pill.ok { color: var(--ok); } .pill.ok .dot { background: var(--ok); }
+  .pill.bad { color: var(--err); } .pill.bad .dot { background: var(--err); }
+  .pill.warn { color: var(--warn); } .pill.warn .dot { background: var(--warn); }
+  .status .spacer { margin-left: auto; color: var(--faint); }
+  button.linkish { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }
+
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px); opacity: 0;
+    background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px;
+    transition: opacity .18s, transform .18s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 860px) {
+    html, body { height: auto; }
+    main { flex: none; display: flex; flex-direction: column; }
+    .stack { display: flex; flex-direction: column; }
+    #pane-in, #pane-out, #pane-schema { height: 60vh; min-height: 320px; }
+    .pane-head { flex-wrap: wrap; row-gap: 6px; }
+    .pane-head .actions { flex-wrap: wrap; }
+    .toolbar .sep { display: none; }
+    header { padding: 12px 14px; } .toolbar, main, footer.status { padding-left: 14px; padding-right: 14px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>json <span class="arrow">→</span> yaml</h1>
+    <span>converter · schema inference · validation</span>
+  </div>
+  <div class="seg" role="group" aria-label="Mode">
+    <button data-mode="convert" aria-pressed="true">Convert</button>
+    <button data-mode="schema" aria-pressed="false">Infer schema</button>
+    <button data-mode="validate" aria-pressed="false">Validate</button>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="group" id="g-dir">
+    <div class="seg" role="group" aria-label="Direction">
+      <button data-dir="j2y" aria-pressed="true">JSON → YAML</button>
+      <button data-dir="y2j" aria-pressed="false" id="dir-y2j" title="Uses js-yaml">YAML → JSON</button>
+    </div>
+    <span class="sep"></span>
+  </div>
+  <div class="group" id="g-yaml">
+    <label>Indent
+      <select data-opt="indent"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>8</option></select>
+    </label>
+    <label data-y="1">Quotes
+      <select data-opt="quoteStyle"><option value="single">'single'</option><option value="double">"double"</option></select>
+    </label>
+    <label data-y="1">Flow from depth
+      <select data-opt="flowLevel"><option value="-1">never</option><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
+    </label>
+    <label data-y="1"><input type="checkbox" data-opt="indentSequences" checked> Indent lists</label>
+    <label data-y="1"><input type="checkbox" data-opt="sortKeys"> Sort keys</label>
+    <label data-y="1"><input type="checkbox" data-opt="blockScalars" checked> Block strings</label>
+    <label data-y="1"><input type="checkbox" data-opt="documentStart"> <code>---</code></label>
+  </div>
+  <span class="sep" id="sep-in"></span>
+  <div class="group" id="g-input">
+    <label title="Allow // and /* */ comments and trailing commas"><input type="checkbox" data-opt="lenient"> Comments &amp; trailing commas</label>
+    <label title="JSON Lines / NDJSON / concatenated JSON → multiple YAML documents"><input type="checkbox" data-opt="multi"> Multi-document (NDJSON)</label>
+  </div>
+  <span class="sep" id="sep-schema" hidden></span>
+  <div class="group" id="g-schema" hidden>
+    <label>Draft
+      <select data-sopt="draft"><option value="2020-12">2020-12</option><option value="2019-09">2019-09</option><option value="07">07</option><option value="06">06</option><option value="04">04</option></select>
+    </label>
+    <label>Title <input type="text" data-sopt="title" placeholder="optional"></label>
+    <label><input type="checkbox" data-sopt="required" checked> Required</label>
+    <label><input type="checkbox" data-sopt="detectFormats" checked> Formats</label>
+    <label><input type="checkbox" data-sopt="closed"> Closed objects</label>
+    <label>Output
+      <select data-sopt="as"><option value="yaml">YAML</option><option value="json">JSON</option></select>
+    </label>
+  </div>
+</div>
+
+<main id="main">
+  <section class="pane" id="pane-in">
+    <div class="pane-head">
+      <h2 id="in-title">JSON input</h2><span class="meta" id="in-meta"></span>
+      <div class="actions">
+        <button class="btn" id="btn-sample">Sample</button>
+        <button class="btn" id="btn-format" title="Pretty-print the JSON (keeps key order and number text)">Format</button>
+        <button class="btn" id="btn-open">Open file</button>
+        <button class="btn" id="btn-clear">Clear</button>
+        <input type="file" id="file" accept=".json,.jsonl,.ndjson,.yaml,.yml,.txt,application/json" hidden>
+      </div>
+    </div>
+    <div class="editor" id="ed-in">
+      <div class="gutter" id="gut-in">1</div>
+      <textarea id="in" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Paste JSON here, drop a file, or press Sample"></textarea>
+    </div>
+  </section>
+
+  <div class="stack" id="right">
+    <section class="pane" id="pane-schema" hidden>
+      <div class="pane-head">
+        <h2>JSON Schema</h2><span class="meta">JSON or YAML</span>
+        <div class="actions">
+          <button class="btn" id="btn-use-inferred" title="Fill in a schema inferred from the input">Infer from input</button>
+          <button class="btn" id="btn-open-schema">Open file</button>
+          <input type="file" id="file-schema" accept=".json,.yaml,.yml,.txt" hidden>
+        </div>
+      </div>
+      <div class="editor" id="ed-schema">
+        <div class="gutter" id="gut-schema">1</div>
+        <textarea id="schema" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Paste a JSON Schema (JSON or YAML)"></textarea>
+      </div>
+    </section>
+    <section class="pane" id="pane-out">
+      <div class="pane-head">
+        <h2 id="out-title">YAML output</h2><span class="meta" id="out-meta"></span>
+        <div class="actions">
+          <button class="btn primary" id="btn-copy">Copy</button>
+        </div>
+      </div>
+      <div class="output" id="out"></div>
+    </section>
+  </div>
+</main>
+
+<footer class="status">
+  <span class="pill" id="st-parse"><span class="dot"></span><span>Waiting for input</span></span>
+  <span class="pill" id="st-rt" hidden><span class="dot"></span><span></span></span>
+  <span id="st-stats"></span>
+  <span class="spacer">Runs entirely in your browser · nothing is uploaded</span>
+</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+/*__JSONYAML__*/
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" async id="jsyaml-script"></script>
+<script>
+(function () {
+  'use strict';
+  const J = window.JsonYaml;
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    input: $('in'), gutIn: $('gut-in'), schema: $('schema'), gutSchema: $('gut-schema'), out: $('out'),
+    inMeta: $('in-meta'), outMeta: $('out-meta'), inTitle: $('in-title'), outTitle: $('out-title'),
+    stParse: $('st-parse'), stRt: $('st-rt'), stStats: $('st-stats'), paneSchema: $('pane-schema'), right: $('right'),
+  };
+
+  const SAMPLE = JSON.stringify({
+    service: 'checkout-api',
+    version: '1.10',
+    enabled: true,
+    replicas: 3,
+    timeoutSeconds: 2.5,
+    owner: { team: 'payments', email: 'payments@example.com', oncall: null },
+    regions: ['eu-west-1', 'ap-south-1'],
+    feature_flags: { 'new-cart': 'yes', 'legacy-tax': 'no', 'dark-mode': 'on' },
+    endpoints: [
+      { path: '/v1/orders', methods: ['GET', 'POST'], rateLimit: 1000, auth: 'oauth2' },
+      { path: '/v1/orders/{id}', methods: ['GET', 'PATCH', 'DELETE'], rateLimit: 250, auth: 'oauth2' },
+      { path: '/healthz', methods: ['GET'], rateLimit: 0, auth: null },
+    ],
+    database: { url: 'postgres://db.internal:5432/checkout', pool: { min: 2, max: 20 }, migrations: [] },
+    releasedAt: '2026-11-02T09:30:00Z',
+    build: { id: '8f14e45f-ceea-467a-9b7e-1f3e8a2c1d00', commit: '007', tags: {} },
+    notes: 'Deploy order:\n1. run migrations\n2. roll pods\n',
+    'key: with colon': '# not a comment',
+    unicode: 'Lahore · لاہور · 東京',
+  }, null, 2);
+
+  const state = {
+    mode: 'convert', dir: 'j2y',
+    yaml: { indent: 2, quoteStyle: 'single', flowLevel: -1, indentSequences: true, sortKeys: false, blockScalars: true, documentStart: false },
+    input: { lenient: false, multi: false },
+    schema: { draft: '2020-12', title: '', required: true, detectFormats: true, closed: false, as: 'yaml' },
+    lastOutput: '', docs: null,
+  };
+
+  // ---------- persistence (best effort) ----------
+  const store = {
+    get(k) { try { return localStorage.getItem('j2y:' + k); } catch (_) { return null; } },
+    set(k, v) { try { localStorage.setItem('j2y:' + k, v); } catch (_) {} },
+  };
+  try {
+    const saved = JSON.parse(store.get('state') || 'null');
+    if (saved) {
+      Object.assign(state.yaml, saved.yaml); Object.assign(state.input, saved.input); Object.assign(state.schema, saved.schema);
+      if (saved.mode) state.mode = saved.mode;
+      if (saved.dir) state.dir = saved.dir;
+    }
+  } catch (_) {}
+  els.input.value = store.get('input') ?? SAMPLE;
+  els.schema.value = store.get('schema') ?? '';
+  const save = () => {
+    store.set('state', JSON.stringify({ mode: state.mode, dir: state.dir, yaml: state.yaml, input: state.input, schema: state.schema }));
+    store.set('input', els.input.value.length < 2e6 ? els.input.value : '');
+    store.set('schema', els.schema.value.length < 1e6 ? els.schema.value : '');
+  };
+
+  // ---------- helpers ----------
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const fmtBytes = (n) => (n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(2) + ' MB');
+  const countLines = (s) => { let n = 1; for (let i = 0; i < s.length; i++) if (s.charCodeAt(i) === 10) n++; return n; };
+  const byteLen = (s) => new Blob([s]).size;
+  let toastTimer;
+  function toast(msg) {
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 1600);
+  }
+  function setPill(el, kind, text) {
+    el.hidden = false;
+    el.className = 'pill' + (kind ? ' ' + kind : '');
+    el.lastElementChild.innerHTML = text;
+  }
+
+  // ---------- gutters ----------
+  function syncGutter(ta, gut, badLine) {
+    const n = countLines(ta.value);
+    if (gut._n !== n || gut._bad !== badLine) {
+      let html = '';
+      for (let i = 1; i <= n; i++) html += i === badLine ? `<span class="bad">${i}</span>\n` : i + '\n';
+      gut.innerHTML = html;
+      gut._n = n; gut._bad = badLine;
+    }
+    gut.scrollTop = ta.scrollTop;
+  }
+  for (const [ta, gut] of [[els.input, els.gutIn], [els.schema, els.gutSchema]]) {
+    ta.addEventListener('scroll', () => { gut.scrollTop = ta.scrollTop; });
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        const s = ta.selectionStart, en = ta.selectionEnd;
+        ta.setRangeText('  ', s, en, 'end');
+        ta.dispatchEvent(new Event('input'));
+      }
+    });
+  }
+
+  function jumpTo(ta, pos, len = 1) {
+    if (pos == null) return;
+    ta.focus();
+    ta.setSelectionRange(pos, Math.min(ta.value.length, pos + len));
+    const line = countLines(ta.value.slice(0, pos));
+    ta.scrollTop = Math.max(0, (line - 4) * 20);
+  }
+
+  // ---------- YAML highlighter (for output we generated) ----------
+  function hlScalar(v) {
+    if (v === '') return '';
+    if (/^(null|true|false|~)$/.test(v)) return `<span class="t-kw">${v}</span>`;
+    if (/^[-+]?(?:\d[\d_]*)?(?:\.\d*)?(?:[eE][-+]?\d+)?$/.test(v) && /\d/.test(v)) return `<span class="t-num">${v}</span>`;
+    if (/^[-+]?\.(inf|nan)$/i.test(v)) return `<span class="t-num">${v}</span>`;
+    if (/^[|>][-+]?\d?$/.test(v)) return `<span class="t-block">${v}</span>`;
+    if (v === '[]' || v === '{}') return `<span class="t-punct">${v}</span>`;
+    if (v[0] === '[' || v[0] === '{') return `<span class="t-punct">${esc(v)}</span>`;
+    return `<span class="t-str">${esc(v)}</span>`;
+  }
+  // Returns the length of a quoted scalar starting at s[0], or -1.
+  function quotedLen(s) {
+    const q = s[0];
+    if (q !== '"' && q !== "'") return -1;
+    for (let i = 1; i < s.length; i++) {
+      if (q === "'" && s[i] === "'") { if (s[i + 1] === "'") { i++; continue; } return i + 1; }
+      if (q === '"') { if (s[i] === '\\') { i++; continue; } if (s[i] === '"') return i + 1; }
+    }
+    return -1;
+  }
+  function highlightYAML(text) {
+    const lines = text.replace(/\n$/, '').split('\n');
+    let blockCol = -1; // > -1 while inside a literal block: content lines have indent > blockCol
+    const out = [];
+    for (const line of lines) {
+      const indent = line.length - line.trimStart().length;
+      if (blockCol >= 0) {
+        if (line.trim() === '' || indent > blockCol) { out.push(`<span class="l"><span class="t-block">${esc(line)}</span></span>`); continue; }
+        blockCol = -1;
+      }
+      if (/^(---|\.\.\.)( |$)/.test(line)) {
+        const rest = line.slice(3).trim();
+        out.push(`<span class="l"><span class="t-punct">${line.slice(0, 3)}</span>${rest ? ' ' + hlScalar(rest) : ''}</span>`);
+        if (/^[|>][-+]?$/.test(rest)) blockCol = 0;
+        continue;
+      }
+      const m = /^(\s*)((?:-(?: +|$))*)(\??\s*)(.*)$/.exec(line);
+      let [, ws, dashes, qmark, rest] = m;
+      let html = ws + (dashes ? `<span class="t-punct">${dashes}</span>` : '') + (qmark ? `<span class="t-punct">${qmark}</span>` : '');
+      const keyCol = ws.length + dashes.length + qmark.length;
+      let keyEnd = -1;
+      if (rest[0] === ':' && (rest.length === 1 || rest[1] === ' ')) keyEnd = 0;
+      else {
+        const ql = quotedLen(rest);
+        if (ql > 0) { if (rest[ql] === ':' && (ql + 1 === rest.length || rest[ql + 1] === ' ')) keyEnd = ql; }
+        else if (rest[0] !== '[' && rest[0] !== '{') {
+          const k = rest.indexOf(': ');
+          if (k > 0) keyEnd = k; else if (rest.endsWith(':')) keyEnd = rest.length - 1;
+        }
+      }
+      let value = rest;
+      if (keyEnd >= 0) {
+        const key = rest.slice(0, keyEnd);
+        html += key ? `<span class="${/^['"]/.test(key) ? 't-qkey' : 't-key'}">${esc(key)}</span>` : '';
+        html += '<span class="t-punct">:</span>';
+        value = rest.slice(keyEnd + 1);
+        const lead = value.length - value.trimStart().length;
+        html += value.slice(0, lead);
+        value = value.slice(lead);
+      }
+      html += hlScalar(value);
+      if (/^[|>][-+]?\d?$/.test(value)) blockCol = keyEnd >= 0 ? keyCol : Math.max(0, ws.length + dashes.length - 2);
+      out.push(`<span class="l">${html}</span>`);
+    }
+    return out.join('');
+  }
+  function highlightJSON(text) {
+    return text.replace(/\n$/, '').split('\n').map((line) => {
+      const h = esc(line).replace(/(&quot;(?:[^\\&]|\\.|&(?!quot;))*?&quot;)(\s*:)?|\b(true|false|null)\b|(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)/g,
+        (all, str, colon, kw, num) => {
+          if (str) return colon ? `<span class="t-key">${str}</span><span class="t-punct">${colon}</span>` : `<span class="t-str">${str}</span>`;
+          if (kw) return `<span class="t-kw">${kw}</span>`;
+          return `<span class="t-num">${num}</span>`;
+        });
+      return `<span class="l">${h}</span>`;
+    }).join('');
+  }
+  function showCode(text, lang) {
+    state.lastOutput = text;
+    const lines = countLines(text);
+    if (text.length > 1.5e6 || lines > 40000) {
+      els.out.innerHTML = `<pre class="code plain">${esc(text)}</pre>`;
+    } else {
+      els.out.innerHTML = `<pre class="code">${lang === 'json' ? highlightJSON(text) : highlightYAML(text)}</pre>`;
+    }
+    els.outMeta.textContent = `${lines - (text.endsWith('\n') ? 1 : 0)} lines · ${fmtBytes(byteLen(text))}`;
+    $('btn-copy').disabled = false;
+  }
+  function showError(title, detail, frame, onJump) {
+    state.lastOutput = '';
+    els.out.innerHTML = `<div class="errbox"><h3>${esc(title)}</h3>${detail ? `<p>${esc(detail)}</p>` : ''}${frame ? `<pre>${esc(frame)}</pre>` : ''}${onJump ? '<button class="btn" id="btn-jump">Go to error</button>' : ''}</div>`;
+    if (onJump) $('btn-jump').onclick = onJump;
+    els.outMeta.textContent = '';
+    $('btn-copy').disabled = true;
+  }
+
+  // ---------- core run ----------
+  const parseOpts = () => ({ allowComments: state.input.lenient, allowTrailingCommas: state.input.lenient });
+  const schemaOpts = () => ({ draft: state.schema.draft, title: state.schema.title, required: state.schema.required, detectFormats: state.schema.detectFormats, additionalProperties: !state.schema.closed });
+
+  function parseInput(text) {
+    return state.input.multi ? J.parseMulti(text, parseOpts()) : [J.parse(text, parseOpts())];
+  }
+
+  function reportJsonError(e, ta, gut, label) {
+    setPill(els.stParse, 'bad', `${esc(label)}: line ${e.line}, col ${e.column} — ${esc(e.reason)} <button class="linkish" id="st-jump">go</button>`);
+    $('st-jump').onclick = () => jumpTo(ta, e.pos);
+    syncGutter(ta, gut, e.line);
+    showError(`Invalid ${label === 'Schema' ? 'schema JSON' : 'JSON'}`, `${e.reason} at line ${e.line}, column ${e.column}.`, J.codeFrame(ta.value, e.line, e.column), () => jumpTo(ta, e.pos));
+  }
+
+  function statsLine(docs, text) {
+    const st = docs.reduce((a, d) => { const s = J.stats(d); for (const k in s) a[k] = k === 'maxDepth' ? Math.max(a[k] || 0, s[k]) : (a[k] || 0) + s[k]; return a; }, {});
+    const parts = [];
+    if (docs.length !== 1) parts.push(`${docs.length} documents`);
+    parts.push(`${st.keys} keys`, `${st.arrays} arrays`, `depth ${st.maxDepth}`);
+    return parts.join(' · ');
+  }
+
+  function run() {
+    const text = els.input.value;
+    els.inMeta.textContent = text ? `${countLines(text)} lines · ${fmtBytes(byteLen(text))}` : '';
+    els.stRt.hidden = true;
+    els.stStats.textContent = '';
+    syncGutter(els.input, els.gutIn, 0);
+    syncGutter(els.schema, els.gutSchema, 0);
+    save();
+
+    if (!text.trim()) {
+      setPill(els.stParse, '', 'Waiting for input');
+      els.out.innerHTML = '';
+      els.outMeta.textContent = '';
+      state.lastOutput = '';
+      $('btn-copy').disabled = true;
+      return;
+    }
+
+    if (state.mode === 'convert' && state.dir === 'y2j') return runYamlToJson(text);
+
+    let docs;
+    try { docs = parseInput(text); } catch (e) {
+      if (e instanceof J.JSONParseError) return reportJsonError(e, els.input, els.gutIn, 'JSON');
+      throw e;
+    }
+    state.docs = docs;
+    setPill(els.stParse, 'ok', state.input.multi ? `Valid JSON · ${docs.length} document${docs.length === 1 ? '' : 's'}` : 'Valid JSON');
+    els.stStats.textContent = statsLine(docs, text);
+
+    if (state.mode === 'convert') {
+      const yaml = state.input.multi ? J.emitDocuments(docs, state.yaml) : J.emit(docs[0], state.yaml);
+      showCode(yaml, 'yaml');
+      verifyRoundTrip(yaml, docs);
+    } else if (state.mode === 'schema') {
+      const ast = J.inferSchemaAST(docs, schemaOpts());
+      if (state.schema.as === 'json') showCode(J.toJSON(ast, state.yaml.indent) + '\n', 'json');
+      else showCode(J.emit(ast, state.yaml), 'yaml');
+      setPill(els.stRt, '', `Schema inferred from ${docs.length} sample${docs.length === 1 ? '' : 's'}`);
+    } else {
+      runValidate(docs);
+    }
+  }
+
+  function verifyRoundTrip(yaml, docs) {
+    const jy = window.jsyaml;
+    if (!jy) { setPill(els.stRt, '', 'Round-trip check loading…'); return; }
+    if (yaml.length > 5e6) { setPill(els.stRt, '', 'Round-trip check skipped (large output)'); return; }
+    try {
+      const back = state.input.multi ? jy.loadAll(yaml) : [jy.load(yaml)];
+      const ok = back.length === docs.length && docs.every((d, i) => J.deepEqual(J.toJS(d), back[i]));
+      setPill(els.stRt, ok ? 'ok' : 'warn', ok ? 'Round-trip verified: js-yaml reads it back identically' : 'Round-trip differs (please report)');
+    } catch (e) {
+      setPill(els.stRt, 'bad', 'js-yaml could not read the output: ' + esc(e.message.split('\n')[0]));
+    }
+  }
+
+  function runYamlToJson(text) {
+    const jy = window.jsyaml;
+    if (!jy) {
+      setPill(els.stParse, 'warn', 'YAML parser (js-yaml) is still loading or unavailable');
+      showError('YAML → JSON needs js-yaml', 'The YAML parser loads from cdnjs. Check your connection and reload the page.');
+      return;
+    }
+    let docs;
+    try { docs = jy.loadAll(text); } catch (e) {
+      const mark = e.mark || {};
+      const line = (mark.line || 0) + 1, col = (mark.column || 0) + 1;
+      setPill(els.stParse, 'bad', `YAML: line ${line}, col ${col} — ${esc(e.reason || e.message)}`);
+      syncGutter(els.input, els.gutIn, line);
+      showError('Invalid YAML', `${e.reason || e.message} at line ${line}, column ${col}.`, J.codeFrame(text, line, col), () => jumpTo(els.input, mark.position || 0));
+      return;
+    }
+    docs = docs.filter((d) => d !== undefined);
+    const ind = state.yaml.indent;
+    let out;
+    const replacer = (k, v) => (v instanceof Date ? v.toISOString() : v);
+    if (state.input.multi) out = docs.map((d) => JSON.stringify(d, replacer)).join('\n') + '\n';
+    else out = JSON.stringify(docs.length === 1 ? docs[0] : docs, replacer, ind) + '\n';
+    setPill(els.stParse, 'ok', `Valid YAML · ${docs.length} document${docs.length === 1 ? '' : 's'}`);
+    showCode(out, 'json');
+  }
+
+  function parseSchemaText(t) {
+    try { return { value: J.toJS(J.parse(t, { allowComments: true, allowTrailingCommas: true })) }; } catch (jsonErr) {
+      const looksJson = /^\s*[{[]/.test(t);
+      if (window.jsyaml && !looksJson) {
+        try { return { value: window.jsyaml.load(t) }; } catch (yErr) {
+          return { error: { kind: 'yaml', e: yErr } };
+        }
+      }
+      return { error: { kind: 'json', e: jsonErr } };
+    }
+  }
+
+  function runValidate(docs) {
+    const t = els.schema.value;
+    if (!t.trim()) {
+      setPill(els.stRt, '', 'Add a schema to validate against');
+      showError('No schema yet', 'Paste a JSON Schema in the panel above (JSON or YAML), or press "Infer from input" to start from one generated from your data.');
+      return;
+    }
+    const parsed = parseSchemaText(t);
+    if (parsed.error) {
+      const { kind, e } = parsed.error;
+      if (kind === 'json' && e instanceof J.JSONParseError) return reportJsonError(e, els.schema, els.gutSchema, 'Schema');
+      const mark = e.mark || {};
+      const line = (mark.line || 0) + 1, col = (mark.column || 0) + 1;
+      setPill(els.stParse, 'bad', `Schema YAML: line ${line}, col ${col}`);
+      showError('Invalid schema YAML', `${e.reason || e.message} at line ${line}, column ${col}.`, J.codeFrame(t, line, col), () => jumpTo(els.schema, mark.position || 0));
+      return;
+    }
+    const schema = parsed.value;
+    let results;
+    try {
+      results = docs.map((d) => J.validate(J.toJS(d), schema));
+    } catch (e) {
+      if (e instanceof J.SchemaError) {
+        setPill(els.stRt, 'bad', 'Schema error');
+        showError('Schema error', e.message);
+        return;
+      }
+      throw e;
+    }
+    const failed = results.filter((r) => !r.valid).length;
+    const total = results.reduce((a, r) => a + r.total, 0);
+    state.lastOutput = results.map((r, i) => r.errors.map((e) => `${docs.length > 1 ? `[doc ${i + 1}] ` : ''}${e.path}: ${e.message} (${e.keyword})`).join('\n')).filter(Boolean).join('\n') || 'valid';
+    $('btn-copy').disabled = false;
+    let html = '<div class="results">';
+    if (!failed) {
+      html += `<div class="verdict ok"><span class="dot"></span>${docs.length > 1 ? `All ${docs.length} documents match` : 'The input matches'} the schema</div>`;
+    } else {
+      html += `<div class="verdict bad"><span class="dot"></span>${total} problem${total === 1 ? '' : 's'}${docs.length > 1 ? ` in ${failed} of ${docs.length} documents` : ''}</div>`;
+    }
+    results.forEach((r, di) => {
+      if (r.valid) return;
+      if (docs.length > 1) html += `<div class="doc-label">Document ${di + 1}</div>`;
+      r.errors.forEach((e, ei) => {
+        html += `<button class="issue" data-doc="${di}" data-path="${esc(e.path)}"><code>${esc(e.path)}</code><span class="msg">${esc(e.message)}</span><span class="kw">${esc(e.keyword)}</span></button>`;
+      });
+      if (r.total > r.errors.length) html += `<div class="doc-label">…and ${r.total - r.errors.length} more</div>`;
+    });
+    html += '</div>';
+    els.out.innerHTML = html;
+    els.outMeta.textContent = failed ? `${total} error${total === 1 ? '' : 's'}` : 'valid';
+    setPill(els.stRt, failed ? 'bad' : 'ok', failed ? 'Does not match schema' : 'Matches schema');
+    els.out.querySelectorAll('.issue').forEach((b) => {
+      b.onclick = () => {
+        const d = state.docs[+b.dataset.doc];
+        const hit = J.nodeAt(d, b.dataset.path);
+        jumpTo(els.input, hit.pos);
+      };
+    });
+  }
+
+  // ---------- UI wiring ----------
+  function applyModeUI() {
+    document.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode)));
+    document.querySelectorAll('[data-dir]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.dir === state.dir)));
+    const convert = state.mode === 'convert';
+    const y2j = convert && state.dir === 'y2j';
+    $('g-dir').hidden = !convert;
+    $('g-schema').hidden = state.mode !== 'schema';
+    $('sep-schema').hidden = state.mode !== 'schema';
+    els.paneSchema.hidden = state.mode !== 'validate';
+    els.right.style.gridTemplateRows = state.mode === 'validate' ? '' : '1fr';
+    $('g-yaml').hidden = state.mode === 'validate';
+    $('sep-in').hidden = state.mode === 'validate';
+    document.querySelectorAll('#g-yaml [data-y]').forEach((l) => { l.hidden = y2j; });
+    els.inTitle.textContent = y2j ? 'YAML input' : 'JSON input';
+    els.input.placeholder = y2j ? 'Paste YAML here, drop a file, or press Sample' : 'Paste JSON here, drop a file, or press Sample';
+    $('btn-format').hidden = y2j;
+    els.outTitle.textContent = state.mode === 'validate' ? 'Validation result' : state.mode === 'schema' ? 'Inferred JSON Schema' : y2j ? 'JSON output' : 'YAML output';
+    $('btn-copy').textContent = state.mode === 'validate' ? 'Copy report' : 'Copy';
+  }
+
+  document.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => { state.mode = b.dataset.mode; applyModeUI(); run(); }));
+  document.querySelectorAll('[data-dir]').forEach((b) => b.addEventListener('click', () => {
+    if (state.dir === b.dataset.dir) return;
+    // Carry the current output over as the new input when switching direction.
+    if (state.lastOutput && state.mode === 'convert') els.input.value = state.lastOutput;
+    state.dir = b.dataset.dir; applyModeUI(); run();
+  }));
+
+  // options
+  document.querySelectorAll('[data-opt]').forEach((el) => {
+    const k = el.dataset.opt;
+    const target = k in state.input ? state.input : state.yaml;
+    if (el.type === 'checkbox') el.checked = !!target[k]; else el.value = String(target[k]);
+    el.addEventListener('change', () => {
+      target[k] = el.type === 'checkbox' ? el.checked : (k === 'quoteStyle' ? el.value : Number(el.value));
+      run();
+    });
+  });
+  document.querySelectorAll('[data-sopt]').forEach((el) => {
+    const k = el.dataset.sopt;
+    if (el.type === 'checkbox') el.checked = !!state.schema[k]; else el.value = String(state.schema[k]);
+    el.addEventListener(el.type === 'text' ? 'input' : 'change', () => {
+      state.schema[k] = el.type === 'checkbox' ? el.checked : el.value;
+      run();
+    });
+  });
+
+  let timer;
+  const schedule = () => {
+    clearTimeout(timer);
+    const delay = els.input.value.length + els.schema.value.length > 3e5 ? 350 : 60;
+    timer = setTimeout(run, delay);
+  };
+  els.input.addEventListener('input', () => { syncGutter(els.input, els.gutIn, 0); schedule(); });
+  els.schema.addEventListener('input', () => { syncGutter(els.schema, els.gutSchema, 0); schedule(); });
+
+  $('btn-sample').onclick = () => {
+    if (state.mode === 'convert' && state.dir === 'y2j') {
+      els.input.value = J.emit(J.parse(SAMPLE));
+    } else if (state.input.multi) {
+      els.input.value = [
+        { event: 'signup', user: 'u_1', at: '2026-11-20T10:00:00Z', plan: 'free' },
+        { event: 'upgrade', user: 'u_1', at: '2026-11-21T08:12:44Z', plan: 'pro', seats: 5 },
+        { event: 'signup', user: 'u_2', at: '2026-11-22T17:03:09Z', plan: 'free', referrer: 'https://example.com/blog' },
+      ].map((x) => JSON.stringify(x)).join('\n');
+    } else {
+      els.input.value = SAMPLE;
+    }
+    run();
+  };
+  $('btn-format').onclick = () => {
+    try {
+      const docs = parseInput(els.input.value);
+      els.input.value = state.input.multi ? docs.map((d) => J.toJSON(d, 0)).join('\n') : J.toJSON(docs[0], state.yaml.indent);
+      run();
+      toast('Formatted');
+    } catch (e) { run(); toast('Fix the JSON error first'); }
+  };
+  $('btn-clear').onclick = () => { els.input.value = ''; run(); els.input.focus(); };
+  $('btn-copy').onclick = async () => {
+    const text = state.lastOutput;
+    if (!text) return;
+    try { await navigator.clipboard.writeText(text); toast('Copied to clipboard'); } catch (_) {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (__) {}
+      ta.remove();
+      toast(ok ? 'Copied to clipboard' : 'Copy blocked — select the output and copy manually');
+    }
+  };
+  $('btn-use-inferred').onclick = () => {
+    try {
+      const docs = parseInput(els.input.value);
+      els.schema.value = J.toJSON(J.inferSchemaAST(docs, schemaOpts()), 2);
+      run();
+      toast('Schema inferred from input');
+    } catch (e) { toast('Fix the input JSON first'); }
+  };
+
+  function readFileInto(file, ta) {
+    if (!file) return;
+    if (file.size > 50 * 1048576) { toast('File is larger than 50 MB'); return; }
+    const r = new FileReader();
+    r.onload = () => {
+      ta.value = String(r.result);
+      if (ta === els.input && /\.(ndjson|jsonl)$/i.test(file.name) && !state.input.multi) {
+        state.input.multi = true; document.querySelector('[data-opt="multi"]').checked = true;
+      }
+      if (ta === els.input && /\.(ya?ml)$/i.test(file.name) && state.mode === 'convert' && state.dir !== 'y2j') {
+        state.dir = 'y2j'; applyModeUI();
+      }
+      run();
+      toast(`Loaded ${file.name}`);
+    };
+    r.onerror = () => toast('Could not read the file');
+    r.readAsText(file);
+  }
+  $('btn-open').onclick = () => $('file').click();
+  $('file').onchange = (e) => { readFileInto(e.target.files[0], els.input); e.target.value = ''; };
+  $('btn-open-schema').onclick = () => $('file-schema').click();
+  $('file-schema').onchange = (e) => { readFileInto(e.target.files[0], els.schema); e.target.value = ''; };
+  for (const [ed, ta] of [[$('ed-in'), els.input], [$('ed-schema'), els.schema]]) {
+    ed.addEventListener('dragover', (e) => { e.preventDefault(); ed.classList.add('drag'); });
+    ed.addEventListener('dragleave', () => ed.classList.remove('drag'));
+    ed.addEventListener('drop', (e) => {
+      e.preventDefault(); ed.classList.remove('drag');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) readFileInto(e.dataTransfer.files[0], ta);
+    });
+  }
+
+  // js-yaml loads asynchronously; re-run when it arrives so the round-trip badge appears.
+  const jyScript = $('jsyaml-script');
+  jyScript.addEventListener('load', () => run());
+  jyScript.addEventListener('error', () => {
+    $('dir-y2j').disabled = true;
+    $('dir-y2j').title = 'Unavailable: js-yaml could not be loaded';
+    if (state.dir === 'y2j') { state.dir = 'j2y'; applyModeUI(); }
+    run();
+    setPill(els.stRt, '', 'Round-trip check unavailable offline');
+  });
+
+  applyModeUI();
+  run();
+})();
+</script>
+</body>
+</html>

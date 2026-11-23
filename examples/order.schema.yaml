@@ -1,0 +1,68 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Order
+type: object
+properties:
+  orderId:
+    type: string
+    format: uuid
+  createdAt:
+    type: string
+    format: date-time
+  customer:
+    type: object
+    properties:
+      name:
+        type: string
+      email:
+        type: string
+        format: email
+      vip:
+        type: boolean
+    required:
+      - name
+      - email
+      - vip
+  items:
+    type: array
+    items:
+      type: object
+      properties:
+        sku:
+          type: string
+        qty:
+          type: integer
+        price:
+          type: number
+        tags:
+          type: array
+          items:
+            type: string
+        note:
+          type: 'null'
+      required:
+        - sku
+        - qty
+        - price
+        - tags
+  shipping:
+    type: object
+    properties:
+      method:
+        type: string
+      address:
+        type: string
+    required:
+      - method
+      - address
+  notes:
+    type: string
+  version:
+    type: string
+required:
+  - orderId
+  - createdAt
+  - customer
+  - items
+  - shipping
+  - notes
+  - version

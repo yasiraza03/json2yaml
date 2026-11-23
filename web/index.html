@@ -1,0 +1,1941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JSON → YAML Converter &amp; Schema Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f12;
+    --panel: #14171c;
+    --panel-2: #1a1e25;
+    --line: #262b34;
+    --line-2: #323844;
+    --text: #e4e6ea;
+    --muted: #8a92a0;
+    --faint: #5b6270;
+    --accent: #f2b544;
+    --accent-ink: #1b1405;
+    --ok: #5fd08f;
+    --err: #ff6b6b;
+    --warn: #f2b544;
+    --t-key: #8ab4ff;
+    --t-str: #b7e08a;
+    --t-num: #f7a76c;
+    --t-kw: #d49cff;
+    --t-punct: #6f7887;
+    --t-block: #e9d38a;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f2ee; --panel: #fffdf9; --panel-2: #f8f6f1; --line: #e3dfd6; --line-2: #d3cec2;
+      --text: #1d1f23; --muted: #646a74; --faint: #9aa0a9; --accent: #c98a12; --accent-ink: #fff;
+      --ok: #1f9d5a; --err: #d63b3b; --warn: #b7791f;
+      --t-key: #2559c7; --t-str: #3f7d1f; --t-num: #b8520f; --t-kw: #8a3fc4; --t-punct: #8b919b; --t-block: #8a6d0f;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text); font: 14px/1.45 var(--sans);
+    display: flex; flex-direction: column; min-height: 100vh;
+  }
+  button, select, input { font: inherit; color: inherit; }
+
+  header {
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    padding: 14px 20px 12px; border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+  .brand h1 { font: 600 17px/1 var(--mono); margin: 0; letter-spacing: -0.02em; }
+  .brand h1 .arrow { color: var(--accent); }
+  .brand span { color: var(--muted); font-size: 12.5px; }
+
+  .seg { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 3px; gap: 2px; }
+  .seg button {
+    border: 0; background: transparent; padding: 6px 13px; border-radius: 6px; cursor: pointer;
+    color: var(--muted); font-weight: 500; font-size: 13px;
+  }
+  .seg button:hover { color: var(--text); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+  .toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+    padding: 10px 20px; border-bottom: 1px solid var(--line); background: var(--panel-2);
+    font-size: 12.5px; color: var(--muted);
+  }
+  .toolbar .group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+  .toolbar .sep { width: 1px; height: 18px; background: var(--line-2); }
+  .toolbar label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
+  .toolbar select, .toolbar input[type="text"] {
+    background: var(--panel); border: 1px solid var(--line-2); border-radius: 6px; padding: 3px 6px; font-size: 12.5px;
+  }
+  .toolbar input[type="text"] { width: 120px; }
+  .toolbar input[type="checkbox"] { accent-color: var(--accent); margin: 0; }
+  [hidden] { display: none !important; }
+
+  main {
+    flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 14px 20px; min-height: 0;
+  }
+  .pane {
+    display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+  }
+  .stack { display: grid; grid-template-rows: 1fr 1fr; gap: 14px; min-height: 0; }
+  .pane-head {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px;
+    border-bottom: 1px solid var(--line); min-height: 42px;
+  }
+  .pane-head h2 { font: 600 11.5px/1 var(--sans); text-transform: uppercase; letter-spacing: 0.08em; margin: 0; color: var(--muted); }
+  .pane-head .meta { color: var(--faint); font: 12px var(--mono); margin-left: 6px; }
+  .pane-head .actions { margin-left: auto; display: flex; gap: 6px; }
+  .btn {
+    border: 1px solid var(--line-2); background: var(--panel-2); border-radius: 6px; padding: 4px 10px;
+    font-size: 12.5px; cursor: pointer; color: var(--text); white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--faint); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .btn:disabled { opacity: .45; cursor: default; }
+
+  .editor { position: relative; flex: 1; display: flex; min-height: 0; }
+  .gutter {
+    flex: none; width: 48px; padding: 12px 8px 12px 0; text-align: right; overflow: hidden;
+    color: var(--faint); font: 13px/20px var(--mono); user-select: none; border-right: 1px solid var(--line);
+    white-space: pre; background: var(--panel-2);
+  }
+  .gutter .bad { color: var(--err); font-weight: 600; }
+  textarea {
+    flex: 1; resize: none; border: 0; outline: none; background: transparent; color: var(--text);
+    font: 13px/20px var(--mono); padding: 12px 14px; white-space: pre; overflow: auto; tab-size: 2;
+  }
+  textarea::placeholder { color: var(--faint); }
+  .editor.drag { outline: 2px dashed var(--accent); outline-offset: -6px; }
+
+  .output { flex: 1; overflow: auto; min-height: 0; }
+  pre.code {
+    margin: 0; padding: 12px 14px 12px 0; font: 13px/20px var(--mono); counter-reset: ln; min-width: max-content;
+  }
+  pre.code .l { display: block; padding-left: 62px; position: relative; white-space: pre; min-height: 20px; }
+  pre.code .l::before {
+    counter-increment: ln; content: counter(ln); position: absolute; left: 0; width: 48px; padding-right: 8px;
+    text-align: right; color: var(--faint); border-right: 1px solid var(--line); background: var(--panel-2);
+  }
+  pre.code.plain { padding-left: 14px; white-space: pre; }
+  .t-key { color: var(--t-key); }
+  .t-str { color: var(--t-str); }
+  .t-num { color: var(--t-num); }
+  .t-kw { color: var(--t-kw); }
+  .t-punct { color: var(--t-punct); }
+  .t-block { color: var(--t-block); }
+  .t-qkey { color: var(--t-key); font-style: italic; }
+
+  .errbox { padding: 18px; }
+  .errbox h3 { margin: 0 0 6px; color: var(--err); font-size: 14px; }
+  .errbox p { margin: 0 0 12px; color: var(--muted); }
+  .errbox pre { margin: 0; padding: 12px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; font: 12.5px/1.5 var(--mono); overflow: auto; }
+  .errbox .btn { margin-top: 12px; }
+
+  .results { padding: 6px 0; }
+  .verdict { display: flex; align-items: center; gap: 10px; padding: 12px 16px; font-weight: 600; }
+  .verdict.ok { color: var(--ok); }
+  .verdict.bad { color: var(--err); }
+  .verdict .dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+  .issue {
+    display: grid; grid-template-columns: minmax(90px, auto) 1fr auto; gap: 12px; align-items: baseline;
+    padding: 8px 16px; border-top: 1px solid var(--line); cursor: pointer; width: 100%; text-align: left;
+    background: transparent; border-left: 0; border-right: 0; border-bottom: 0;
+  }
+  .issue:hover { background: var(--panel-2); }
+  .issue code { font: 12.5px var(--mono); color: var(--t-key); word-break: break-all; }
+  .issue .msg { color: var(--text); }
+  .issue .kw { font: 11.5px var(--mono); color: var(--faint); }
+  .doc-label { padding: 10px 16px 4px; color: var(--muted); font: 600 11.5px var(--sans); text-transform: uppercase; letter-spacing: .06em; }
+
+  footer.status {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 8px 20px 12px; font: 12px var(--mono); color: var(--muted);
+  }
+  .pill { display: inline-flex; align-items: center; gap: 6px; }
+  .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+  .pill.ok { color: var(--ok); } .pill.ok .dot { background: var(--ok); }
+  .pill.bad { color: var(--err); } .pill.bad .dot { background: var(--err); }
+  .pill.warn { color: var(--warn); } .pill.warn .dot { background: var(--warn); }
+  .status .spacer { margin-left: auto; color: var(--faint); }
+  button.linkish { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }
+
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px); opacity: 0;
+    background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px;
+    transition: opacity .18s, transform .18s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 860px) {
+    html, body { height: auto; }
+    main { flex: none; display: flex; flex-direction: column; }
+    .stack { display: flex; flex-direction: column; }
+    #pane-in, #pane-out, #pane-schema { height: 60vh; min-height: 320px; }
+    .pane-head { flex-wrap: wrap; row-gap: 6px; }
+    .pane-head .actions { flex-wrap: wrap; }
+    .toolbar .sep { display: none; }
+    header { padding: 12px 14px; } .toolbar, main, footer.status { padding-left: 14px; padding-right: 14px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>json <span class="arrow">→</span> yaml</h1>
+    <span>converter · schema inference · validation</span>
+  </div>
+  <div class="seg" role="group" aria-label="Mode">
+    <button data-mode="convert" aria-pressed="true">Convert</button>
+    <button data-mode="schema" aria-pressed="false">Infer schema</button>
+    <button data-mode="validate" aria-pressed="false">Validate</button>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="group" id="g-dir">
+    <div class="seg" role="group" aria-label="Direction">
+      <button data-dir="j2y" aria-pressed="true">JSON → YAML</button>
+      <button data-dir="y2j" aria-pressed="false" id="dir-y2j" title="Uses js-yaml">YAML → JSON</button>
+    </div>
+    <span class="sep"></span>
+  </div>
+  <div class="group" id="g-yaml">
+    <label>Indent
+      <select data-opt="indent"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>8</option></select>
+    </label>
+    <label data-y="1">Quotes
+      <select data-opt="quoteStyle"><option value="single">'single'</option><option value="double">"double"</option></select>
+    </label>
+    <label data-y="1">Flow from depth
+      <select data-opt="flowLevel"><option value="-1">never</option><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
+    </label>
+    <label data-y="1"><input type="checkbox" data-opt="indentSequences" checked> Indent lists</label>
+    <label data-y="1"><input type="checkbox" data-opt="sortKeys"> Sort keys</label>
+    <label data-y="1"><input type="checkbox" data-opt="blockScalars" checked> Block strings</label>
+    <label data-y="1"><input type="checkbox" data-opt="documentStart"> <code>---</code></label>
+  </div>
+  <span class="sep" id="sep-in"></span>
+  <div class="group" id="g-input">
+    <label title="Allow // and /* */ comments and trailing commas"><input type="checkbox" data-opt="lenient"> Comments &amp; trailing commas</label>
+    <label title="JSON Lines / NDJSON / concatenated JSON → multiple YAML documents"><input type="checkbox" data-opt="multi"> Multi-document (NDJSON)</label>
+  </div>
+  <span class="sep" id="sep-schema" hidden></span>
+  <div class="group" id="g-schema" hidden>
+    <label>Draft
+      <select data-sopt="draft"><option value="2020-12">2020-12</option><option value="2019-09">2019-09</option><option value="07">07</option><option value="06">06</option><option value="04">04</option></select>
+    </label>
+    <label>Title <input type="text" data-sopt="title" placeholder="optional"></label>
+    <label><input type="checkbox" data-sopt="required" checked> Required</label>
+    <label><input type="checkbox" data-sopt="detectFormats" checked> Formats</label>
+    <label><input type="checkbox" data-sopt="closed"> Closed objects</label>
+    <label>Output
+      <select data-sopt="as"><option value="yaml">YAML</option><option value="json">JSON</option></select>
+    </label>
+  </div>
+</div>
+
+<main id="main">
+  <section class="pane" id="pane-in">
+    <div class="pane-head">
+      <h2 id="in-title">JSON input</h2><span class="meta" id="in-meta"></span>
+      <div class="actions">
+        <button class="btn" id="btn-sample">Sample</button>
+        <button class="btn" id="btn-format" title="Pretty-print the JSON (keeps key order and number text)">Format</button>
+        <button class="btn" id="btn-open">Open file</button>
+        <button class="btn" id="btn-clear">Clear</button>
+        <input type="file" id="file" accept=".json,.jsonl,.ndjson,.yaml,.yml,.txt,application/json" hidden>
+      </div>
+    </div>
+    <div class="editor" id="ed-in">
+      <div class="gutter" id="gut-in">1</div>
+      <textarea id="in" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Paste JSON here, drop a file, or press Sample"></textarea>
+    </div>
+  </section>
+
+  <div class="stack" id="right">
+    <section class="pane" id="pane-schema" hidden>
+      <div class="pane-head">
+        <h2>JSON Schema</h2><span class="meta">JSON or YAML</span>
+        <div class="actions">
+          <button class="btn" id="btn-use-inferred" title="Fill in a schema inferred from the input">Infer from input</button>
+          <button class="btn" id="btn-open-schema">Open file</button>
+          <input type="file" id="file-schema" accept=".json,.yaml,.yml,.txt" hidden>
+        </div>
+      </div>
+      <div class="editor" id="ed-schema">
+        <div class="gutter" id="gut-schema">1</div>
+        <textarea id="schema" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Paste a JSON Schema (JSON or YAML)"></textarea>
+      </div>
+    </section>
+    <section class="pane" id="pane-out">
+      <div class="pane-head">
+        <h2 id="out-title">YAML output</h2><span class="meta" id="out-meta"></span>
+        <div class="actions">
+          <button class="btn primary" id="btn-copy">Copy</button>
+        </div>
+      </div>
+      <div class="output" id="out"></div>
+    </section>
+  </div>
+</main>
+
+<footer class="status">
+  <span class="pill" id="st-parse"><span class="dot"></span><span>Waiting for input</span></span>
+  <span class="pill" id="st-rt" hidden><span class="dot"></span><span></span></span>
+  <span id="st-stats"></span>
+  <span class="spacer">Runs entirely in your browser · nothing is uploaded</span>
+</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+/*!
+ * jsonyaml v1.0.0 — zero-dependency JSON → YAML converter with
+ * JSON Schema inference and validation. Works in Node.js and browsers.
+ * MIT License.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.JsonYaml = factory();
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  const VERSION = '1.0.0';
+  const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
+  /* ======================================================================
+   * Errors & diagnostics
+   * ==================================================================== */
+
+  class JSONParseError extends Error {
+    constructor(reason, pos, line, column) {
+      super(`${reason} (line ${line}, column ${column})`);
+      this.name = 'JSONParseError';
+      this.reason = reason;
+      this.pos = pos;
+      this.line = line;
+      this.column = column;
+    }
+  }
+
+  class SchemaError extends Error {
+    constructor(message) {
+      super(message);
+      this.name = 'SchemaError';
+    }
+  }
+
+  function locate(text, pos) {
+    let line = 1, lineStart = 0;
+    const end = Math.min(pos, text.length);
+    for (let k = 0; k < end; k++) {
+      if (text.charCodeAt(k) === 10) { line++; lineStart = k + 1; }
+    }
+    return { line, column: pos - lineStart + 1 };
+  }
+
+  /** Render a code frame pointing at line/column (1-based). */
+  function codeFrame(text, line, column, context = 2) {
+    const lines = String(text).split('\n').map((l) => l.replace(/\r$/, ''));
+    const from = Math.max(1, line - context);
+    const to = Math.min(lines.length, line + context);
+    const width = String(to).length;
+    const out = [];
+    for (let ln = from; ln <= to; ln++) {
+      const src = lines[ln - 1] ?? '';
+      const mark = ln === line ? '>' : ' ';
+      out.push(`${mark} ${String(ln).padStart(width)} | ${src}`);
+      if (ln === line) {
+        const lead = src.slice(0, Math.max(0, column - 1)).replace(/[^\t]/g, ' ');
+        out.push(`  ${' '.repeat(width)} | ${lead}^`);
+      }
+    }
+    return out.join('\n');
+  }
+
+  /* ======================================================================
+   * JSON parser → ordered AST
+   *   { t: 'obj', entries: [{ key, value }] }
+   *   { t: 'arr', items: [] }
+   *   { t: 'str', v } | { t: 'num', raw, v } | { t: 'bool', v } | { t: 'null' }
+   * Key order is preserved exactly (including integer-like keys) and
+   * numbers keep their original text so no precision is lost.
+   * ==================================================================== */
+
+  const DEFAULT_PARSE_OPTIONS = {
+    allowComments: false,      // permit // and /* */ comments
+    allowTrailingCommas: false, // permit [1,2,] and {"a":1,}
+    duplicateKeys: 'last',      // 'last' (like JSON.parse) | 'error'
+    maxDepth: 1000,
+  };
+
+  function createParser(text, options) {
+    const o = Object.assign({}, DEFAULT_PARSE_OPTIONS, options);
+    text = String(text);
+    const n = text.length;
+    let i = text.charCodeAt(0) === 0xfeff ? 1 : 0;
+
+    const fail = (reason, pos = i) => {
+      const { line, column } = locate(text, pos);
+      throw new JSONParseError(reason, pos, line, column);
+    };
+    const show = (p = i) => {
+      if (p >= n) return 'end of input';
+      const cp = text.codePointAt(p);
+      const ch = String.fromCodePoint(cp);
+      return cp < 0x20 ? `control character U+${cp.toString(16).toUpperCase().padStart(4, '0')}` : `'${ch}'`;
+    };
+    const isDigit = (c) => c >= 48 && c <= 57;
+
+    function ws() {
+      for (;;) {
+        const c = text.charCodeAt(i);
+        if (c === 32 || c === 9 || c === 10 || c === 13) { i++; continue; }
+        if (c === 47 /* / */ && o.allowComments) {
+          const d = text.charCodeAt(i + 1);
+          if (d === 47) { i += 2; while (i < n && text.charCodeAt(i) !== 10) i++; continue; }
+          if (d === 42) {
+            const e = text.indexOf('*/', i + 2);
+            if (e < 0) fail('Unterminated block comment');
+            i = e + 2; continue;
+          }
+        }
+        return;
+      }
+    }
+
+    function value(depth) {
+      if (depth > o.maxDepth) fail(`Maximum nesting depth (${o.maxDepth}) exceeded`);
+      ws();
+      const start = i;
+      const node = valueAt(depth);
+      node.pos = start; // source offset, used to map validation errors back to the text
+      return node;
+    }
+
+    function valueAt(depth) {
+      const c = text[i];
+      switch (c) {
+        case '{': return object(depth);
+        case '[': return array(depth);
+        case '"': return { t: 'str', v: string() };
+        case 't': return literal('true', { t: 'bool', v: true });
+        case 'f': return literal('false', { t: 'bool', v: false });
+        case 'n': return literal('null', { t: 'null' });
+        default:
+          if (c === '-' || isDigit(text.charCodeAt(i))) return number();
+          if (c === undefined) fail('Unexpected end of input, expected a value');
+          if (c === "'") fail('Strings must use double quotes');
+          if (/[A-Za-z_$]/.test(c)) {
+            const m = /^[A-Za-z_$][\w$]*/.exec(text.slice(i, i + 40));
+            const w = m ? m[0] : c;
+            if (/^(NaN|Infinity|undefined)$/.test(w)) fail(`'${w}' is not valid JSON`);
+            fail(`Unexpected token '${w}', expected a value`);
+          }
+          fail(`Unexpected ${show()}, expected a value`);
+      }
+    }
+
+    function literal(word, node) {
+      if (text.startsWith(word, i)) {
+        const after = text.charCodeAt(i + word.length);
+        if (!(after >= 65 && after <= 90) && !(after >= 97 && after <= 122) && !isDigit(after) && after !== 95) {
+          i += word.length;
+          return node;
+        }
+      }
+      const m = /^[A-Za-z_$][\w$]*/.exec(text.slice(i, i + 40));
+      fail(`Unexpected token '${m ? m[0] : text[i]}', expected a value`);
+    }
+
+    function number() {
+      const start = i;
+      if (text[i] === '-') i++;
+      if (text[i] === '0') {
+        i++;
+        if (isDigit(text.charCodeAt(i))) fail('Numbers cannot have leading zeros', start);
+      } else if (isDigit(text.charCodeAt(i))) {
+        while (isDigit(text.charCodeAt(i))) i++;
+      } else {
+        fail(text[i] === 'I' ? "'-Infinity' is not valid JSON" : `Invalid number: expected a digit after '-'`);
+      }
+      if (text[i] === '.') {
+        i++;
+        if (!isDigit(text.charCodeAt(i))) fail('Invalid number: expected a digit after the decimal point');
+        while (isDigit(text.charCodeAt(i))) i++;
+      }
+      if (text[i] === 'e' || text[i] === 'E') {
+        i++;
+        if (text[i] === '+' || text[i] === '-') i++;
+        if (!isDigit(text.charCodeAt(i))) fail('Invalid number: expected a digit in the exponent');
+        while (isDigit(text.charCodeAt(i))) i++;
+      }
+      const raw = text.slice(start, i);
+      return { t: 'num', raw, v: Number(raw) };
+    }
+
+    function string() {
+      const start = i;
+      i++; // opening quote
+      let out = '';
+      let chunk = i;
+      for (;;) {
+        if (i >= n) fail('Unterminated string', start);
+        const c = text.charCodeAt(i);
+        if (c === 34) { out += text.slice(chunk, i); i++; return out; }
+        if (c === 92) {
+          out += text.slice(chunk, i);
+          const e = text[i + 1];
+          switch (e) {
+            case '"': out += '"'; break;
+            case '\\': out += '\\'; break;
+            case '/': out += '/'; break;
+            case 'b': out += '\b'; break;
+            case 'f': out += '\f'; break;
+            case 'n': out += '\n'; break;
+            case 'r': out += '\r'; break;
+            case 't': out += '\t'; break;
+            case 'u': {
+              const h = text.slice(i + 2, i + 6);
+              if (!/^[0-9a-fA-F]{4}$/.test(h)) fail('Invalid unicode escape: expected \\u followed by 4 hex digits');
+              out += String.fromCharCode(parseInt(h, 16));
+              i += 4;
+              break;
+            }
+            default:
+              if (e === undefined) fail('Unterminated string', start);
+              fail(`Invalid escape sequence '\\${e}'`);
+          }
+          i += 2;
+          chunk = i;
+          continue;
+        }
+        if (c < 0x20) fail(c === 10 ? 'Unescaped line break in string (use \\n)' : `Unescaped ${show()} in string`);
+        i++;
+      }
+    }
+
+    function object(depth) {
+      const open = i;
+      i++;
+      const entries = [];
+      const index = new Map();
+      ws();
+      if (text[i] === '}') { i++; return { t: 'obj', entries }; }
+      for (;;) {
+        ws();
+        if (text[i] !== '"') {
+          if (text[i] === '}' && entries.length && o.allowTrailingCommas) { i++; return { t: 'obj', entries }; }
+          if (i >= n) fail("Unterminated object, expected '}'", open);
+          if (text[i] === '}') fail('Trailing comma is not allowed in JSON');
+          if (text[i] === "'") fail('Property names must use double quotes');
+          fail(`Expected a property name in double quotes, got ${show()}`);
+        }
+        const keyPos = i;
+        const key = string();
+        ws();
+        if (text[i] !== ':') fail(`Expected ':' after property name, got ${show()}`);
+        i++;
+        const val = value(depth + 1);
+        if (index.has(key)) {
+          if (o.duplicateKeys === 'error') fail(`Duplicate key "${key}"`, keyPos);
+          entries[index.get(key)].value = val; // last wins, first position kept (JSON.parse semantics)
+        } else {
+          index.set(key, entries.length);
+          entries.push({ key, value: val, keyPos });
+        }
+        ws();
+        if (text[i] === ',') { i++; continue; }
+        if (text[i] === '}') { i++; return { t: 'obj', entries }; }
+        if (i >= n) fail("Unterminated object, expected '}'", open);
+        fail(`Expected ',' or '}' after property value, got ${show()}`);
+      }
+    }
+
+    function array(depth) {
+      const open = i;
+      i++;
+      const items = [];
+      ws();
+      if (text[i] === ']') { i++; return { t: 'arr', items }; }
+      for (;;) {
+        ws();
+        if (text[i] === ']' && items.length) {
+          if (o.allowTrailingCommas) { i++; return { t: 'arr', items }; }
+          fail('Trailing comma is not allowed in JSON');
+        }
+        if (text[i] === ',') fail('Unexpected comma, expected a value');
+        items.push(value(depth + 1));
+        ws();
+        if (text[i] === ',') { i++; continue; }
+        if (text[i] === ']') { i++; return { t: 'arr', items }; }
+        if (i >= n) fail("Unterminated array, expected ']'", open);
+        fail(`Expected ',' or ']' after array element, got ${show()}`);
+      }
+    }
+
+    return {
+      one() {
+        ws();
+        if (i >= n) fail('Empty input, expected a JSON value');
+        const v = value(0);
+        ws();
+        if (i < n) fail(`Unexpected ${show()} after the end of the JSON value`);
+        return v;
+      },
+      many() {
+        const docs = [];
+        ws();
+        while (i < n) {
+          docs.push(value(0));
+          ws();
+          if (text[i] === ',') fail('Unexpected comma between documents');
+        }
+        return docs;
+      },
+    };
+  }
+
+  /** Parse one JSON document into an ordered AST. */
+  function parse(text, options) {
+    return createParser(text, options).one();
+  }
+
+  /** Parse JSON Lines / NDJSON / concatenated JSON into an array of ASTs. */
+  function parseMulti(text, options) {
+    return createParser(text, options).many();
+  }
+
+  /* ======================================================================
+   * AST ⇄ plain JavaScript
+   * ==================================================================== */
+
+  function fromJS(value) {
+    const seen = new Set();
+    const skip = (x) => x === undefined || typeof x === 'function' || typeof x === 'symbol';
+    function conv(v) {
+      if (v === null || v === undefined) return { t: 'null' };
+      switch (typeof v) {
+        case 'boolean': return { t: 'bool', v };
+        case 'string': return { t: 'str', v };
+        case 'bigint': return { t: 'num', raw: v.toString(), v: Number(v) };
+        case 'number':
+          if (Number.isNaN(v)) return { t: 'num', raw: '.nan', v };
+          if (!Number.isFinite(v)) return { t: 'num', raw: v > 0 ? '.inf' : '-.inf', v };
+          return { t: 'num', raw: Object.is(v, -0) ? '-0' : String(v), v };
+        case 'object': break;
+        default: return { t: 'null' };
+      }
+      if (seen.has(v)) throw new TypeError('Cannot convert a circular structure to YAML');
+      if (typeof v.toJSON === 'function') return conv(v.toJSON());
+      seen.add(v);
+      let node;
+      if (Array.isArray(v)) {
+        node = { t: 'arr', items: v.map((x) => (skip(x) ? { t: 'null' } : conv(x))) };
+      } else if (v instanceof Map) {
+        node = { t: 'obj', entries: [] };
+        for (const [k, x] of v) if (!skip(x)) node.entries.push({ key: String(k), value: conv(x) });
+      } else {
+        node = { t: 'obj', entries: [] };
+        for (const k of Object.keys(v)) if (!skip(v[k])) node.entries.push({ key: k, value: conv(v[k]) });
+      }
+      seen.delete(v);
+      return node;
+    }
+    return conv(value);
+  }
+
+  function toJS(node) {
+    switch (node.t) {
+      case 'null': return null;
+      case 'bool': case 'str': case 'num': return node.v;
+      case 'arr': return node.items.map(toJS);
+      case 'obj': {
+        const out = {};
+        for (const e of node.entries) {
+          Object.defineProperty(out, e.key, { value: toJS(e.value), enumerable: true, writable: true, configurable: true });
+        }
+        return out;
+      }
+      default: throw new TypeError(`Unknown node type: ${node && node.t}`);
+    }
+  }
+
+  /** Serialize an AST back to JSON text (preserving key order and number text). */
+  function toJSON(node, indent = 2) {
+    const pad = typeof indent === 'number' ? ' '.repeat(indent) : String(indent || '');
+    function s(n, cur) {
+      switch (n.t) {
+        case 'null': return 'null';
+        case 'bool': return n.v ? 'true' : 'false';
+        case 'num': return /^[.+-]?\.?(inf|nan)$/i.test(n.raw) ? 'null' : n.raw;
+        case 'str': return JSON.stringify(n.v);
+        case 'arr': {
+          if (!n.items.length) return '[]';
+          if (!pad) return '[' + n.items.map((x) => s(x, '')).join(',') + ']';
+          const inner = cur + pad;
+          return '[\n' + n.items.map((x) => inner + s(x, inner)).join(',\n') + '\n' + cur + ']';
+        }
+        case 'obj': {
+          if (!n.entries.length) return '{}';
+          if (!pad) return '{' + n.entries.map((e) => JSON.stringify(e.key) + ':' + s(e.value, '')).join(',') + '}';
+          const inner = cur + pad;
+          return '{\n' + n.entries.map((e) => inner + JSON.stringify(e.key) + ': ' + s(e.value, inner)).join(',\n') + '\n' + cur + '}';
+        }
+      }
+    }
+    return s(node, '');
+  }
+
+  /* ======================================================================
+   * YAML emitter (YAML 1.2, safe for YAML 1.1 parsers too)
+   * ==================================================================== */
+
+  const DEFAULT_YAML_OPTIONS = {
+    indent: 2,               // spaces per level (1–8)
+    indentSequences: true,   // "key:\n  - a" (true) vs "key:\n- a" (false)
+    sortKeys: false,         // sort mapping keys alphabetically
+    flowLevel: -1,           // nesting depth at which to switch to {flow: [style]}; -1 = never
+    quoteStyle: 'single',    // 'single' | 'double' for strings that need quoting
+    blockScalars: true,      // emit multi-line strings as | literal blocks
+    documentStart: false,    // prefix the document with ---
+  };
+
+  // Characters a single-quoted (or plain) scalar cannot carry: must be escaped in double quotes.
+  const NEEDS_ESCAPE = /[\x00-\x08\x0A-\x1F\x7F-\x9F\u2028\u2029\uFEFF\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+  // Strings a YAML 1.1 or 1.2 parser would resolve to a non-string type.
+  const RESERVED_WORD = /^(?:~|null|true|false|y|yes|n|no|on|off)$/i;
+  const NON_STRING_PATTERNS = [
+    /^[-+]?(?:\.[0-9_]+|[0-9][0-9_]*(?:\.[0-9_]*)?)(?:[eE][-+]?[0-9]+)?$/, // ints & floats
+    /^[-+]?(?:[0-9][0-9_]*)?\.[0-9._]*(?:[eE][-+][0-9]+)?$/,              // YAML 1.1 floats: ".", "1.2.3"
+    /^[-+]?(?:[0-9][0-9_]*)?(?:\.[0-9_]*)?[eE][-+]?[0-9]+$/,              // exponent forms: "E9", ".e5"
+    /^[-+]?\.(?:inf|nan)$/i,                                              // .inf .nan
+    /^[-+]?0[xX][0-9a-fA-F_]+$/,                                          // hex
+    /^[-+]?0[oO][0-7_]+$/,                                                // octal
+    /^[-+]?0[bB][01_]+$/,                                                 // binary
+    /^[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+(?:\.[0-9_]*)?$/,                 // sexagesimal (1.1)
+    /^\d{4}-\d\d?-\d\d?(?:$|[Tt ])/,                                      // timestamps
+  ];
+
+  function looksLikeNonString(s) {
+    if (RESERVED_WORD.test(s) || s === '<<' || s === '=') return true;
+    for (const re of NON_STRING_PATTERNS) if (re.test(s)) return true;
+    return false;
+  }
+
+  function isPlainSafe(s, flow) {
+    if (s === '') return false;
+    if (/^\s|\s$/.test(s)) return false;
+    if (s.includes('\t')) return false;
+    if (NEEDS_ESCAPE.test(s)) return false;
+    const c = s[0];
+    if ('[]{},#&*!|>\'"%@`:?'.includes(c)) return false;
+    if (c === '-' && (s.length === 1 || s[1] === ' ' || (flow && ',[]{}'.includes(s[1])))) return false;
+    if (s.startsWith('---') || s.startsWith('...')) return false;
+    if (s.includes(': ') || s.includes(' #') || s.endsWith(':')) return false;
+    if (flow && /[,[\]{}]/.test(s)) return false;
+    if (looksLikeNonString(s)) return false;
+    return true;
+  }
+
+  function doubleQuote(s) {
+    let out = '"';
+    for (const ch of s) {
+      const cp = ch.codePointAt(0);
+      switch (cp) {
+        case 0x22: out += '\\"'; continue;
+        case 0x5c: out += '\\\\'; continue;
+        case 0x00: out += '\\0'; continue;
+        case 0x07: out += '\\a'; continue;
+        case 0x08: out += '\\b'; continue;
+        case 0x09: out += '\\t'; continue;
+        case 0x0a: out += '\\n'; continue;
+        case 0x0b: out += '\\v'; continue;
+        case 0x0c: out += '\\f'; continue;
+        case 0x0d: out += '\\r'; continue;
+        case 0x1b: out += '\\e'; continue;
+        case 0x85: out += '\\N'; continue;
+        case 0x2028: out += '\\L'; continue;
+        case 0x2029: out += '\\P'; continue;
+      }
+      if (cp < 0x20 || (cp >= 0x7f && cp <= 0x9f)) out += '\\x' + cp.toString(16).toUpperCase().padStart(2, '0');
+      else if (cp === 0xfeff || cp === 0xfffe || cp === 0xffff || (cp >= 0xd800 && cp <= 0xdfff)) out += '\\u' + cp.toString(16).toUpperCase().padStart(4, '0');
+      else out += ch;
+    }
+    return out + '"';
+  }
+
+  const singleQuote = (s) => "'" + s.replace(/'/g, "''") + "'";
+
+  function scalarString(s, o, flow) {
+    if (NEEDS_ESCAPE.test(s)) return doubleQuote(s);
+    if (isPlainSafe(s, flow)) return s;
+    return o.quoteStyle === 'double' ? doubleQuote(s) : singleQuote(s);
+  }
+
+  // Literal block scalar (|, |-, |+) for multi-line strings, or null if not representable safely.
+  function literalBlock(s) {
+    if (NEEDS_ESCAPE.test(s.replace(/\n/g, ''))) return null;
+    if (/[ \t]\n|[ \t]$/.test(s)) return null; // trailing whitespace would be fragile
+    let m = s.length;
+    while (m > 0 && s[m - 1] === '\n') m--;
+    const core = s.slice(0, m);
+    const trailing = s.length - m;
+    if (core === '') return null;
+    const lines = core.split('\n');
+    const first = lines.find((l) => l !== '');
+    if (/^[ \t]/.test(first)) return null; // would need an indentation indicator
+    for (let k = 1; k < trailing; k++) lines.push('');
+    return { header: '|' + (trailing === 0 ? '-' : trailing === 1 ? '' : '+'), body: lines };
+  }
+
+  // JSON numbers are valid YAML 1.2 floats/ints. Numbers that overflow (1e400)
+  // become .inf so every YAML parser reads the same value JSON.parse produces.
+  function yamlNumber(node) {
+    if (Number.isFinite(node.v) || /^[-+]?\.(inf|nan)$/i.test(node.raw)) return node.raw;
+    if (Number.isNaN(node.v)) return '.nan';
+    return node.v > 0 ? '.inf' : '-.inf';
+  }
+
+  function normalizeYamlOptions(options) {
+    const o = Object.assign({}, DEFAULT_YAML_OPTIONS, options);
+    o.indent = Math.max(1, Math.min(8, parseInt(o.indent, 10) || 2));
+    o.flowLevel = Number.isInteger(+o.flowLevel) ? +o.flowLevel : -1;
+    o.quoteStyle = o.quoteStyle === 'double' ? 'double' : 'single';
+    return o;
+  }
+
+  function orderedEntries(node, o) {
+    if (!o.sortKeys) return node.entries;
+    return node.entries.slice().sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  }
+
+  function renderKey(k, o, flow) {
+    return scalarString(k, o, flow);
+  }
+
+  function renderFlow(node, o) {
+    switch (node.t) {
+      case 'null': return 'null';
+      case 'bool': return node.v ? 'true' : 'false';
+      case 'num': return yamlNumber(node);
+      case 'str': return scalarString(node.v, o, true);
+      case 'arr': return '[' + node.items.map((x) => renderFlow(x, o)).join(', ') + ']';
+      case 'obj':
+        return '{' + orderedEntries(node, o).map((e) => renderKey(e.key, o, true) + ': ' + renderFlow(e.value, o)).join(', ') + '}';
+    }
+  }
+
+  // Returns { inline } | { header, body } | { kind, lines }
+  function renderNode(node, depth, o) {
+    switch (node.t) {
+      case 'null': return { inline: 'null' };
+      case 'bool': return { inline: node.v ? 'true' : 'false' };
+      case 'num': return { inline: yamlNumber(node) };
+      case 'str': {
+        if (o.blockScalars && node.v.includes('\n')) {
+          const b = literalBlock(node.v);
+          if (b) return b;
+        }
+        return { inline: scalarString(node.v, o, false) };
+      }
+      case 'arr':
+        if (!node.items.length) return { inline: '[]' };
+        if (o.flowLevel >= 0 && depth >= o.flowLevel) return { inline: renderFlow(node, o) };
+        return { kind: 'seq', lines: renderSeq(node, depth, o) };
+      case 'obj':
+        if (!node.entries.length) return { inline: '{}' };
+        if (o.flowLevel >= 0 && depth >= o.flowLevel) return { inline: renderFlow(node, o) };
+        return { kind: 'map', lines: renderMap(node, depth, o) };
+      default:
+        throw new TypeError(`Unknown node type: ${node && node.t}`);
+    }
+  }
+
+  const indentLine = (prefix, l) => (l === '' ? '' : prefix + l);
+
+  function renderSeq(node, depth, o) {
+    const lines = [];
+    const w = Math.max(2, o.indent);
+    const dash = '-' + ' '.repeat(w - 1);
+    const cont = ' '.repeat(w);
+    for (const item of node.items) {
+      const r = renderNode(item, depth + 1, o);
+      if (r.inline !== undefined) {
+        lines.push('- ' + r.inline);
+      } else if (r.header !== undefined) {
+        lines.push('- ' + r.header);
+        for (const l of r.body) lines.push(indentLine(cont, l));
+      } else {
+        r.lines.forEach((l, k) => lines.push(k === 0 ? dash + l : indentLine(cont, l)));
+      }
+    }
+    return lines;
+  }
+
+  function renderMap(node, depth, o) {
+    const lines = [];
+    const pad = ' '.repeat(o.indent);
+    for (const e of orderedEntries(node, o)) {
+      const k = renderKey(e.key, o, false);
+      const explicit = k.length > 1024; // implicit keys are limited to 1024 chars
+      const r = renderNode(e.value, depth + 1, o);
+      let prefix;
+      if (explicit) { lines.push('? ' + k); prefix = ':'; } else prefix = k + ':';
+      if (r.inline !== undefined) {
+        lines.push(prefix + ' ' + r.inline);
+      } else if (r.header !== undefined) {
+        lines.push(prefix + ' ' + r.header);
+        for (const l of r.body) lines.push(indentLine(pad, l));
+      } else if (r.kind === 'seq' && !o.indentSequences && !explicit) {
+        lines.push(prefix);
+        for (const l of r.lines) lines.push(l);
+      } else {
+        lines.push(prefix);
+        for (const l of r.lines) lines.push(indentLine(pad, l));
+      }
+    }
+    return lines;
+  }
+
+  function emitDocument(node, o) {
+    const r = renderNode(node, 0, o);
+    const start = o.documentStart ? '---' : '';
+    if (r.inline !== undefined) return (start ? start + ' ' : '') + r.inline + '\n';
+    if (r.header !== undefined) {
+      const pad = ' '.repeat(o.indent);
+      return [(start ? start + ' ' : '') + r.header, ...r.body.map((l) => indentLine(pad, l))].join('\n') + '\n';
+    }
+    return (start ? start + '\n' : '') + r.lines.join('\n') + '\n';
+  }
+
+  /** Emit YAML from an AST node (from parse()). */
+  function emit(node, options) {
+    return emitDocument(node, normalizeYamlOptions(options));
+  }
+
+  /** Emit a multi-document YAML stream from an array of AST nodes. */
+  function emitDocuments(nodes, options) {
+    const o = normalizeYamlOptions(Object.assign({}, options, { documentStart: true }));
+    return nodes.map((n) => emitDocument(n, o)).join('');
+  }
+
+  /** Convert a plain JavaScript value to YAML. */
+  function stringify(value, options) {
+    return emit(fromJS(value), options);
+  }
+
+  /** Convert JSON text to YAML text. options = parse options + YAML options + { multi }. */
+  function convert(jsonText, options = {}) {
+    if (options.multi) return emitDocuments(parseMulti(jsonText, options), options);
+    return emit(parse(jsonText, options), options);
+  }
+
+  /* ======================================================================
+   * String formats (shared by inference and validation)
+   * ==================================================================== */
+
+  function validDate(y, m, d) {
+    if (m < 1 || m > 12 || d < 1) return false;
+    const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+    const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1];
+    return d <= days;
+  }
+  const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+  const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d):([0-5]\d|60)(\.\d+)?(z|[+-]([01]\d|2[0-3]):[0-5]\d)$/i;
+  const LABEL = '[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?';
+
+  const FORMATS = {
+    'date-time': (s) => {
+      const k = s.search(/[Tt]/);
+      return k === 10 && FORMATS.date(s.slice(0, 10)) && FORMATS.time(s.slice(11));
+    },
+    date: (s) => {
+      const m = DATE_RE.exec(s);
+      return !!m && validDate(+m[1], +m[2], +m[3]);
+    },
+    time: (s) => TIME_RE.test(s),
+    uuid: (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s),
+    email: (s) => new RegExp(`^[^\\s@"(),:;<>[\\]\\\\]+@${LABEL}(?:\\.${LABEL})+$`).test(s),
+    uri: (s) => /^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s/?#]+[^\s]*$/.test(s) || /^(?:mailto|urn|tel|data):[^\s]+$/i.test(s),
+    ipv4: (s) => /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/.test(s),
+  };
+  const FORMAT_DETECT_ORDER = ['date-time', 'date', 'time', 'uuid', 'email', 'uri', 'ipv4'];
+
+  function detectFormat(s) {
+    for (const f of FORMAT_DETECT_ORDER) if (FORMATS[f](s)) return f;
+    return null;
+  }
+
+  /* ======================================================================
+   * JSON Schema inference
+   * ==================================================================== */
+
+  const DEFAULT_SCHEMA_OPTIONS = {
+    draft: '2020-12',            // '2020-12' | '2019-09' | '07' | '06' | '04'
+    required: true,              // list properties present in every sample as required
+    additionalProperties: true,  // false → closed objects
+    detectFormats: true,         // add "format" when every string sample matches one
+    title: '',                   // optional title for the root schema
+  };
+
+  const DRAFT_URIS = {
+    '2020-12': 'https://json-schema.org/draft/2020-12/schema',
+    '2019-09': 'https://json-schema.org/draft/2019-09/schema',
+    '07': 'http://json-schema.org/draft-07/schema#',
+    '06': 'http://json-schema.org/draft-06/schema#',
+    '04': 'http://json-schema.org/draft-04/schema#',
+  };
+
+  const newShape = () => ({ count: 0, kinds: {} });
+
+  function observe(shape, node, o) {
+    shape.count++;
+    const k = shape.kinds;
+    switch (node.t) {
+      case 'null': k.null = true; break;
+      case 'bool': k.boolean = true; break;
+      case 'num':
+        if (/^-?\d+$/.test(node.raw)) k.integer = true; else k.number = true;
+        break;
+      case 'str': {
+        const s = k.string || (k.string = { count: 0, formats: new Map() });
+        s.count++;
+        if (o.detectFormats) {
+          const f = detectFormat(node.v);
+          s.formats.set(f, (s.formats.get(f) || 0) + 1);
+        }
+        break;
+      }
+      case 'arr': {
+        const a = k.array || (k.array = { items: newShape() });
+        for (const it of node.items) observe(a.items, it, o);
+        break;
+      }
+      case 'obj': {
+        const ob = k.object || (k.object = { count: 0, props: new Map() });
+        ob.count++;
+        for (const e of node.entries) {
+          let p = ob.props.get(e.key);
+          if (!p) { p = newShape(); ob.props.set(e.key, p); }
+          observe(p, e.value, o);
+        }
+        break;
+      }
+    }
+  }
+
+  const S = (v) => ({ t: 'str', v });
+  const B = (v) => ({ t: 'bool', v });
+  const A = (items) => ({ t: 'arr', items });
+  const O = (pairs) => ({ t: 'obj', entries: pairs.map(([key, value]) => ({ key, value })) });
+
+  function renderShape(shape, o) {
+    if (!shape.count) return O([]);
+    const k = shape.kinds;
+    const types = [];
+    if (k.object) types.push('object');
+    if (k.array) types.push('array');
+    if (k.string) types.push('string');
+    if (k.number) types.push('number');
+    else if (k.integer) types.push('integer');
+    if (k.boolean) types.push('boolean');
+    if (k.null) types.push('null');
+
+    const pairs = [['type', types.length === 1 ? S(types[0]) : A(types.map(S))]];
+    if (k.string && o.detectFormats && k.string.formats.size === 1) {
+      const [f] = k.string.formats.keys();
+      if (f) pairs.push(['format', S(f)]);
+    }
+    if (k.object) {
+      const props = [];
+      const req = [];
+      for (const [name, p] of k.object.props) {
+        props.push([name, renderShape(p, o)]);
+        if (p.count === k.object.count) req.push(S(name));
+      }
+      if (props.length) pairs.push(['properties', O(props)]);
+      if (o.required && req.length) pairs.push(['required', A(req)]);
+      if (o.additionalProperties === false) pairs.push(['additionalProperties', B(false)]);
+    }
+    if (k.array && k.array.items.count) pairs.push(['items', renderShape(k.array.items, o)]);
+    return O(pairs);
+  }
+
+  function normalizeSchemaOptions(options) {
+    const o = Object.assign({}, DEFAULT_SCHEMA_OPTIONS, options);
+    o.draft = String(o.draft).replace(/^draft-?0?/, '').replace(/^(\d)$/, '0$1');
+    if (!DRAFT_URIS[o.draft]) o.draft = '2020-12';
+    o.additionalProperties = o.additionalProperties !== false;
+    o.required = o.required !== false;
+    o.detectFormats = o.detectFormats !== false;
+    return o;
+  }
+
+  /** Infer a JSON Schema (as an AST) from one or more AST samples. */
+  function inferSchemaAST(samples, options) {
+    const o = normalizeSchemaOptions(options);
+    const list = Array.isArray(samples) ? samples : [samples];
+    const shape = newShape();
+    for (const s of list) observe(shape, s, o);
+    const body = renderShape(shape, o);
+    const head = [['$schema', S(DRAFT_URIS[o.draft])]];
+    if (o.title) head.push(['title', S(String(o.title))]);
+    return O(head.concat(body.entries.map((e) => [e.key, e.value])));
+  }
+
+  /** Infer a JSON Schema (plain object) from a JavaScript value. */
+  function inferSchema(value, options) {
+    return toJS(inferSchemaAST(fromJS(value), options));
+  }
+
+  /** Infer a JSON Schema from a list of JavaScript sample values. */
+  function inferSchemaFromSamples(values, options) {
+    return toJS(inferSchemaAST(values.map(fromJS), options));
+  }
+
+  /* ======================================================================
+   * JSON Schema validator (drafts 04 → 2020-12, local $ref)
+   * ==================================================================== */
+
+  const isObj = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
+
+  function typeName(x) {
+    if (x === null) return 'null';
+    if (Array.isArray(x)) return 'array';
+    if (typeof x === 'number') return isType(x, 'integer') ? 'integer' : 'number';
+    return typeof x;
+  }
+
+  function isType(x, t) {
+    switch (t) {
+      case 'null': return x === null;
+      case 'boolean': return typeof x === 'boolean';
+      case 'string': return typeof x === 'string';
+      // JSON numbers that overflow a double (1e400) parse to ±Infinity; they are still numbers (and integers).
+      case 'number': return typeof x === 'number' && !Number.isNaN(x);
+      case 'integer': return typeof x === 'number' && (Number.isInteger(x) || x === Infinity || x === -Infinity);
+      case 'array': return Array.isArray(x);
+      case 'object': return isObj(x);
+      default: return false;
+    }
+  }
+
+  function deepEqual(a, b) {
+    if (a === b) return true;
+    if (typeof a !== typeof b || a === null || b === null) return false;
+    if (Array.isArray(a)) {
+      if (!Array.isArray(b) || a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) if (!deepEqual(a[i], b[i])) return false;
+      return true;
+    }
+    if (typeof a === 'object') {
+      if (Array.isArray(b)) return false;
+      const ka = Object.keys(a), kb = Object.keys(b);
+      if (ka.length !== kb.length) return false;
+      for (const k of ka) if (!hasOwn(b, k) || !deepEqual(a[k], b[k])) return false;
+      return true;
+    }
+    return false;
+  }
+
+  function canonical(x) {
+    if (Array.isArray(x)) return '[' + x.map(canonical).join(',') + ']';
+    if (isObj(x)) return '{' + Object.keys(x).sort().map((k) => JSON.stringify(k) + ':' + canonical(x[k])).join(',') + '}';
+    return JSON.stringify(x);
+  }
+
+  const short = (x) => {
+    const s = JSON.stringify(x);
+    return s && s.length > 60 ? s.slice(0, 57) + '...' : s;
+  };
+  const ptr = (path, k) => path + '/' + String(k).replace(/~/g, '~0').replace(/\//g, '~1');
+
+  /**
+   * Validate a JavaScript value against a JSON Schema.
+   * @returns {{ valid: boolean, errors: { path, keyword, message }[] }}
+   */
+  function validate(data, schema, options = {}) {
+    const checkFormats = options.formats !== false;
+    const maxErrors = options.maxErrors || 200;
+    const regexCache = new Map();
+    const anchors = new Map();
+
+    (function collect(s) {
+      if (Array.isArray(s)) { s.forEach(collect); return; }
+      if (!isObj(s)) return;
+      if (typeof s.$anchor === 'string') anchors.set(s.$anchor, s);
+      if (typeof s.$id === 'string' && s.$id.startsWith('#')) anchors.set(s.$id.slice(1), s);
+      for (const k of Object.keys(s)) if (k !== 'enum' && k !== 'const') collect(s[k]);
+    })(schema);
+
+    function resolve(ref) {
+      let r = ref;
+      const rootId = isObj(schema) && typeof schema.$id === 'string' ? schema.$id.replace(/#$/, '') : null;
+      if (rootId && r.startsWith(rootId)) r = r.slice(rootId.length);
+      if (r === '' || r === '#') return schema;
+      if (r.startsWith('#/')) {
+        let cur = schema;
+        for (const raw of r.slice(2).split('/')) {
+          const p = decodeURIComponent(raw).replace(/~1/g, '/').replace(/~0/g, '~');
+          if ((isObj(cur) || Array.isArray(cur)) && hasOwn(cur, p)) cur = cur[p];
+          else throw new SchemaError(`Cannot resolve $ref "${ref}"`);
+        }
+        return cur;
+      }
+      if (r.startsWith('#') && anchors.has(r.slice(1))) return anchors.get(r.slice(1));
+      throw new SchemaError(`Cannot resolve $ref "${ref}" (only references within the same schema are supported)`);
+    }
+
+    function regex(p) {
+      if (regexCache.has(p)) return regexCache.get(p);
+      let re;
+      try { re = new RegExp(p, 'u'); } catch (_) {
+        try { re = new RegExp(p); } catch (e) { throw new SchemaError(`Invalid regular expression in schema: ${p}`); }
+      }
+      regexCache.set(p, re);
+      return re;
+    }
+
+    const E = (errs, path, keyword, message) => { errs.push({ path: path || '/', keyword, message }); };
+
+    function v(x, s, path, errs, depth) {
+      if (s === true || s === undefined) return true;
+      if (s === false) { E(errs, path, 'false', 'no value is allowed here'); return false; }
+      if (!isObj(s)) return true;
+      if (depth > 400) throw new SchemaError('Schema recursion is too deep (circular $ref?)');
+      const start = errs.length;
+      const d = depth + 1;
+
+      if (typeof s.$ref === 'string') v(x, resolve(s.$ref), path, errs, d);
+      if (typeof s.$dynamicRef === 'string') v(x, resolve(s.$dynamicRef), path, errs, d);
+
+      if (s.type !== undefined) {
+        const types = Array.isArray(s.type) ? s.type : [s.type];
+        if (!types.some((t) => isType(x, t))) E(errs, path, 'type', `expected ${types.join(' or ')}, got ${typeName(x)}`);
+      }
+      if (Array.isArray(s.enum) && !s.enum.some((e) => deepEqual(e, x))) {
+        E(errs, path, 'enum', `must be one of: ${s.enum.map(short).join(', ')}`);
+      }
+      if (hasOwn(s, 'const') && !deepEqual(s.const, x)) E(errs, path, 'const', `must be equal to ${short(s.const)}`);
+
+      if (typeof x === 'number') {
+        if (typeof s.minimum === 'number') {
+          if (s.exclusiveMinimum === true ? x <= s.minimum : x < s.minimum) {
+            E(errs, path, 'minimum', `must be ${s.exclusiveMinimum === true ? '>' : '>='} ${s.minimum}`);
+          }
+        }
+        if (typeof s.maximum === 'number') {
+          if (s.exclusiveMaximum === true ? x >= s.maximum : x > s.maximum) {
+            E(errs, path, 'maximum', `must be ${s.exclusiveMaximum === true ? '<' : '<='} ${s.maximum}`);
+          }
+        }
+        if (typeof s.exclusiveMinimum === 'number' && x <= s.exclusiveMinimum) E(errs, path, 'exclusiveMinimum', `must be > ${s.exclusiveMinimum}`);
+        if (typeof s.exclusiveMaximum === 'number' && x >= s.exclusiveMaximum) E(errs, path, 'exclusiveMaximum', `must be < ${s.exclusiveMaximum}`);
+        if (typeof s.multipleOf === 'number' && s.multipleOf > 0) {
+          const q = x / s.multipleOf;
+          if (!Number.isFinite(q) || Math.abs(q - Math.round(q)) > 1e-9 * Math.max(1, Math.abs(q))) {
+            E(errs, path, 'multipleOf', `must be a multiple of ${s.multipleOf}`);
+          }
+        }
+      }
+
+      if (typeof x === 'string') {
+        const len = Array.from(x).length;
+        if (typeof s.minLength === 'number' && len < s.minLength) E(errs, path, 'minLength', `must be at least ${s.minLength} characters long`);
+        if (typeof s.maxLength === 'number' && len > s.maxLength) E(errs, path, 'maxLength', `must be at most ${s.maxLength} characters long`);
+        if (typeof s.pattern === 'string' && !regex(s.pattern).test(x)) E(errs, path, 'pattern', `must match pattern ${s.pattern}`);
+        if (checkFormats && typeof s.format === 'string' && FORMATS[s.format] && !FORMATS[s.format](x)) {
+          E(errs, path, 'format', `must be a valid ${s.format}`);
+        }
+      }
+
+      if (Array.isArray(x)) {
+        let prefix = null, rest;
+        if (Array.isArray(s.prefixItems)) { prefix = s.prefixItems; rest = s.items; }
+        else if (Array.isArray(s.items)) { prefix = s.items; rest = s.additionalItems; }
+        else rest = s.items;
+        x.forEach((it, i) => {
+          const sub = prefix && i < prefix.length ? prefix[i] : rest;
+          if (sub !== undefined) {
+            if (sub === false && prefix && i >= prefix.length) E(errs, ptr(path, i), 'items', `array must have at most ${prefix.length} items`);
+            else v(it, sub, ptr(path, i), errs, d);
+          }
+        });
+        if (typeof s.minItems === 'number' && x.length < s.minItems) E(errs, path, 'minItems', `must have at least ${s.minItems} items`);
+        if (typeof s.maxItems === 'number' && x.length > s.maxItems) E(errs, path, 'maxItems', `must have at most ${s.maxItems} items`);
+        if (s.uniqueItems === true) {
+          const seen = new Map();
+          x.forEach((it, i) => {
+            const c = canonical(it);
+            if (seen.has(c)) E(errs, ptr(path, i), 'uniqueItems', `duplicate of item ${seen.get(c)}`);
+            else seen.set(c, i);
+          });
+        }
+        if (s.contains !== undefined) {
+          let count = 0;
+          for (const it of x) if (v(it, s.contains, path, [], d)) count++;
+          const min = typeof s.minContains === 'number' ? s.minContains : 1;
+          if (count < min) E(errs, path, 'contains', `must contain at least ${min} matching item${min === 1 ? '' : 's'}`);
+          if (typeof s.maxContains === 'number' && count > s.maxContains) E(errs, path, 'maxContains', `must contain at most ${s.maxContains} matching items`);
+        }
+      }
+
+      if (isObj(x)) {
+        const keys = Object.keys(x);
+        if (Array.isArray(s.required)) {
+          for (const r of s.required) if (!hasOwn(x, r)) E(errs, path, 'required', `missing required property "${r}"`);
+        }
+        if (typeof s.minProperties === 'number' && keys.length < s.minProperties) E(errs, path, 'minProperties', `must have at least ${s.minProperties} properties`);
+        if (typeof s.maxProperties === 'number' && keys.length > s.maxProperties) E(errs, path, 'maxProperties', `must have at most ${s.maxProperties} properties`);
+        const props = isObj(s.properties) ? s.properties : null;
+        const pats = isObj(s.patternProperties) ? Object.keys(s.patternProperties).map((p) => [regex(p), s.patternProperties[p]]) : [];
+        for (const k of keys) {
+          let matched = false;
+          if (props && hasOwn(props, k)) { matched = true; v(x[k], props[k], ptr(path, k), errs, d); }
+          for (const [re, sub] of pats) if (re.test(k)) { matched = true; v(x[k], sub, ptr(path, k), errs, d); }
+          if (!matched && s.additionalProperties !== undefined) {
+            if (s.additionalProperties === false) E(errs, ptr(path, k), 'additionalProperties', `property "${k}" is not allowed`);
+            else v(x[k], s.additionalProperties, ptr(path, k), errs, d);
+          }
+        }
+        if (s.propertyNames !== undefined) {
+          for (const k of keys) if (!v(k, s.propertyNames, path, [], d)) E(errs, path, 'propertyNames', `property name "${k}" is invalid`);
+        }
+        const depReq = isObj(s.dependentRequired) ? s.dependentRequired : null;
+        const deps = isObj(s.dependencies) ? s.dependencies : null;
+        const check = (k, dep) => {
+          if (!hasOwn(x, k)) return;
+          if (Array.isArray(dep)) {
+            for (const r of dep) if (!hasOwn(x, r)) E(errs, path, 'dependentRequired', `property "${r}" is required when "${k}" is present`);
+          } else v(x, dep, path, errs, d);
+        };
+        if (depReq) for (const k of Object.keys(depReq)) check(k, depReq[k]);
+        if (deps) for (const k of Object.keys(deps)) check(k, deps[k]);
+        if (isObj(s.dependentSchemas)) for (const k of Object.keys(s.dependentSchemas)) if (hasOwn(x, k)) v(x, s.dependentSchemas[k], path, errs, d);
+      }
+
+      if (Array.isArray(s.allOf)) for (const sub of s.allOf) v(x, sub, path, errs, d);
+      if (Array.isArray(s.anyOf) && !s.anyOf.some((sub) => v(x, sub, path, [], d))) {
+        E(errs, path, 'anyOf', 'must match at least one of the anyOf schemas');
+      }
+      if (Array.isArray(s.oneOf)) {
+        const n = s.oneOf.filter((sub) => v(x, sub, path, [], d)).length;
+        if (n !== 1) E(errs, path, 'oneOf', n === 0 ? 'must match exactly one of the oneOf schemas (matched none)' : `must match exactly one of the oneOf schemas (matched ${n})`);
+      }
+      if (s.not !== undefined && v(x, s.not, path, [], d)) E(errs, path, 'not', 'must not match the "not" schema');
+      if (s.if !== undefined) {
+        const ok = v(x, s.if, path, [], d);
+        if (ok && s.then !== undefined) v(x, s.then, path, errs, d);
+        if (!ok && s.else !== undefined) v(x, s.else, path, errs, d);
+      }
+      return errs.length === start;
+    }
+
+    if (schema !== true && schema !== false && !isObj(schema)) throw new SchemaError('A JSON Schema must be an object or a boolean');
+    const errors = [];
+    v(data, schema, '', errors, 0);
+    return { valid: errors.length === 0, errors: errors.slice(0, maxErrors), total: errors.length };
+  }
+
+  /**
+   * Find the AST node at a JSON Pointer ("/users/0/email"). Returns
+   * { node, pos } where pos is the source offset of the key (or value), or
+   * the deepest existing ancestor when the path does not exist.
+   */
+  function nodeAt(ast, pointer) {
+    let cur = ast;
+    let pos = ast.pos;
+    const parts = !pointer || pointer === '/' ? [] : pointer.replace(/^\//, '').split('/').map((p) => p.replace(/~1/g, '/').replace(/~0/g, '~'));
+    for (const p of parts) {
+      if (cur.t === 'obj') {
+        const e = cur.entries.find((x) => x.key === p);
+        if (!e) break;
+        pos = e.keyPos !== undefined ? e.keyPos : e.value.pos;
+        cur = e.value;
+      } else if (cur.t === 'arr' && /^\d+$/.test(p) && +p < cur.items.length) {
+        cur = cur.items[+p];
+        pos = cur.pos;
+      } else break;
+    }
+    return { node: cur, pos };
+  }
+
+  /* ======================================================================
+   * Stats helper (used by the CLI/web UI)
+   * ==================================================================== */
+
+  function stats(node) {
+    const st = { objects: 0, arrays: 0, strings: 0, numbers: 0, booleans: 0, nulls: 0, keys: 0, maxDepth: 0 };
+    (function walk(n, d) {
+      if (d > st.maxDepth) st.maxDepth = d;
+      switch (n.t) {
+        case 'obj': st.objects++; st.keys += n.entries.length; for (const e of n.entries) walk(e.value, d + 1); break;
+        case 'arr': st.arrays++; for (const x of n.items) walk(x, d + 1); break;
+        case 'str': st.strings++; break;
+        case 'num': st.numbers++; break;
+        case 'bool': st.booleans++; break;
+        case 'null': st.nulls++; break;
+      }
+    })(node, 0);
+    return st;
+  }
+
+  return {
+    VERSION,
+    // parsing
+    parse, parseMulti, JSONParseError, codeFrame,
+    // conversion
+    convert, emit, emitDocuments, stringify, fromJS, toJS, toJSON,
+    // schema
+    inferSchema, inferSchemaAST, inferSchemaFromSamples, validate, SchemaError, FORMATS, detectFormat,
+    // misc
+    stats, deepEqual, nodeAt,
+    defaults: { parse: DEFAULT_PARSE_OPTIONS, yaml: DEFAULT_YAML_OPTIONS, schema: DEFAULT_SCHEMA_OPTIONS },
+  };
+});
+
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" async id="jsyaml-script"></script>
+<script>
+(function () {
+  'use strict';
+  const J = window.JsonYaml;
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    input: $('in'), gutIn: $('gut-in'), schema: $('schema'), gutSchema: $('gut-schema'), out: $('out'),
+    inMeta: $('in-meta'), outMeta: $('out-meta'), inTitle: $('in-title'), outTitle: $('out-title'),
+    stParse: $('st-parse'), stRt: $('st-rt'), stStats: $('st-stats'), paneSchema: $('pane-schema'), right: $('right'),
+  };
+
+  const SAMPLE = JSON.stringify({
+    service: 'checkout-api',
+    version: '1.10',
+    enabled: true,
+    replicas: 3,
+    timeoutSeconds: 2.5,
+    owner: { team: 'payments', email: 'payments@example.com', oncall: null },
+    regions: ['eu-west-1', 'ap-south-1'],
+    feature_flags: { 'new-cart': 'yes', 'legacy-tax': 'no', 'dark-mode': 'on' },
+    endpoints: [
+      { path: '/v1/orders', methods: ['GET', 'POST'], rateLimit: 1000, auth: 'oauth2' },
+      { path: '/v1/orders/{id}', methods: ['GET', 'PATCH', 'DELETE'], rateLimit: 250, auth: 'oauth2' },
+      { path: '/healthz', methods: ['GET'], rateLimit: 0, auth: null },
+    ],
+    database: { url: 'postgres://db.internal:5432/checkout', pool: { min: 2, max: 20 }, migrations: [] },
+    releasedAt: '2026-11-02T09:30:00Z',
+    build: { id: '8f14e45f-ceea-467a-9b7e-1f3e8a2c1d00', commit: '007', tags: {} },
+    notes: 'Deploy order:\n1. run migrations\n2. roll pods\n',
+    'key: with colon': '# not a comment',
+    unicode: 'Lahore · لاہور · 東京',
+  }, null, 2);
+
+  const state = {
+    mode: 'convert', dir: 'j2y',
+    yaml: { indent: 2, quoteStyle: 'single', flowLevel: -1, indentSequences: true, sortKeys: false, blockScalars: true, documentStart: false },
+    input: { lenient: false, multi: false },
+    schema: { draft: '2020-12', title: '', required: true, detectFormats: true, closed: false, as: 'yaml' },
+    lastOutput: '', docs: null,
+  };
+
+  // ---------- persistence (best effort) ----------
+  const store = {
+    get(k) { try { return localStorage.getItem('j2y:' + k); } catch (_) { return null; } },
+    set(k, v) { try { localStorage.setItem('j2y:' + k, v); } catch (_) {} },
+  };
+  try {
+    const saved = JSON.parse(store.get('state') || 'null');
+    if (saved) {
+      Object.assign(state.yaml, saved.yaml); Object.assign(state.input, saved.input); Object.assign(state.schema, saved.schema);
+      if (saved.mode) state.mode = saved.mode;
+      if (saved.dir) state.dir = saved.dir;
+    }
+  } catch (_) {}
+  els.input.value = store.get('input') ?? SAMPLE;
+  els.schema.value = store.get('schema') ?? '';
+  const save = () => {
+    store.set('state', JSON.stringify({ mode: state.mode, dir: state.dir, yaml: state.yaml, input: state.input, schema: state.schema }));
+    store.set('input', els.input.value.length < 2e6 ? els.input.value : '');
+    store.set('schema', els.schema.value.length < 1e6 ? els.schema.value : '');
+  };
+
+  // ---------- helpers ----------
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const fmtBytes = (n) => (n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(2) + ' MB');
+  const countLines = (s) => { let n = 1; for (let i = 0; i < s.length; i++) if (s.charCodeAt(i) === 10) n++; return n; };
+  const byteLen = (s) => new Blob([s]).size;
+  let toastTimer;
+  function toast(msg) {
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 1600);
+  }
+  function setPill(el, kind, text) {
+    el.hidden = false;
+    el.className = 'pill' + (kind ? ' ' + kind : '');
+    el.lastElementChild.innerHTML = text;
+  }
+
+  // ---------- gutters ----------
+  function syncGutter(ta, gut, badLine) {
+    const n = countLines(ta.value);
+    if (gut._n !== n || gut._bad !== badLine) {
+      let html = '';
+      for (let i = 1; i <= n; i++) html += i === badLine ? `<span class="bad">${i}</span>\n` : i + '\n';
+      gut.innerHTML = html;
+      gut._n = n; gut._bad = badLine;
+    }
+    gut.scrollTop = ta.scrollTop;
+  }
+  for (const [ta, gut] of [[els.input, els.gutIn], [els.schema, els.gutSchema]]) {
+    ta.addEventListener('scroll', () => { gut.scrollTop = ta.scrollTop; });
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        const s = ta.selectionStart, en = ta.selectionEnd;
+        ta.setRangeText('  ', s, en, 'end');
+        ta.dispatchEvent(new Event('input'));
+      }
+    });
+  }
+
+  function jumpTo(ta, pos, len = 1) {
+    if (pos == null) return;
+    ta.focus();
+    ta.setSelectionRange(pos, Math.min(ta.value.length, pos + len));
+    const line = countLines(ta.value.slice(0, pos));
+    ta.scrollTop = Math.max(0, (line - 4) * 20);
+  }
+
+  // ---------- YAML highlighter (for output we generated) ----------
+  function hlScalar(v) {
+    if (v === '') return '';
+    if (/^(null|true|false|~)$/.test(v)) return `<span class="t-kw">${v}</span>`;
+    if (/^[-+]?(?:\d[\d_]*)?(?:\.\d*)?(?:[eE][-+]?\d+)?$/.test(v) && /\d/.test(v)) return `<span class="t-num">${v}</span>`;
+    if (/^[-+]?\.(inf|nan)$/i.test(v)) return `<span class="t-num">${v}</span>`;
+    if (/^[|>][-+]?\d?$/.test(v)) return `<span class="t-block">${v}</span>`;
+    if (v === '[]' || v === '{}') return `<span class="t-punct">${v}</span>`;
+    if (v[0] === '[' || v[0] === '{') return `<span class="t-punct">${esc(v)}</span>`;
+    return `<span class="t-str">${esc(v)}</span>`;
+  }
+  // Returns the length of a quoted scalar starting at s[0], or -1.
+  function quotedLen(s) {
+    const q = s[0];
+    if (q !== '"' && q !== "'") return -1;
+    for (let i = 1; i < s.length; i++) {
+      if (q === "'" && s[i] === "'") { if (s[i + 1] === "'") { i++; continue; } return i + 1; }
+      if (q === '"') { if (s[i] === '\\') { i++; continue; } if (s[i] === '"') return i + 1; }
+    }
+    return -1;
+  }
+  function highlightYAML(text) {
+    const lines = text.replace(/\n$/, '').split('\n');
+    let blockCol = -1; // > -1 while inside a literal block: content lines have indent > blockCol
+    const out = [];
+    for (const line of lines) {
+      const indent = line.length - line.trimStart().length;
+      if (blockCol >= 0) {
+        if (line.trim() === '' || indent > blockCol) { out.push(`<span class="l"><span class="t-block">${esc(line)}</span></span>`); continue; }
+        blockCol = -1;
+      }
+      if (/^(---|\.\.\.)( |$)/.test(line)) {
+        const rest = line.slice(3).trim();
+        out.push(`<span class="l"><span class="t-punct">${line.slice(0, 3)}</span>${rest ? ' ' + hlScalar(rest) : ''}</span>`);
+        if (/^[|>][-+]?$/.test(rest)) blockCol = 0;
+        continue;
+      }
+      const m = /^(\s*)((?:-(?: +|$))*)(\??\s*)(.*)$/.exec(line);
+      let [, ws, dashes, qmark, rest] = m;
+      let html = ws + (dashes ? `<span class="t-punct">${dashes}</span>` : '') + (qmark ? `<span class="t-punct">${qmark}</span>` : '');
+      const keyCol = ws.length + dashes.length + qmark.length;
+      let keyEnd = -1;
+      if (rest[0] === ':' && (rest.length === 1 || rest[1] === ' ')) keyEnd = 0;
+      else {
+        const ql = quotedLen(rest);
+        if (ql > 0) { if (rest[ql] === ':' && (ql + 1 === rest.length || rest[ql + 1] === ' ')) keyEnd = ql; }
+        else if (rest[0] !== '[' && rest[0] !== '{') {
+          const k = rest.indexOf(': ');
+          if (k > 0) keyEnd = k; else if (rest.endsWith(':')) keyEnd = rest.length - 1;
+        }
+      }
+      let value = rest;
+      if (keyEnd >= 0) {
+        const key = rest.slice(0, keyEnd);
+        html += key ? `<span class="${/^['"]/.test(key) ? 't-qkey' : 't-key'}">${esc(key)}</span>` : '';
+        html += '<span class="t-punct">:</span>';
+        value = rest.slice(keyEnd + 1);
+        const lead = value.length - value.trimStart().length;
+        html += value.slice(0, lead);
+        value = value.slice(lead);
+      }
+      html += hlScalar(value);
+      if (/^[|>][-+]?\d?$/.test(value)) blockCol = keyEnd >= 0 ? keyCol : Math.max(0, ws.length + dashes.length - 2);
+      out.push(`<span class="l">${html}</span>`);
+    }
+    return out.join('');
+  }
+  function highlightJSON(text) {
+    return text.replace(/\n$/, '').split('\n').map((line) => {
+      const h = esc(line).replace(/(&quot;(?:[^\\&]|\\.|&(?!quot;))*?&quot;)(\s*:)?|\b(true|false|null)\b|(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)/g,
+        (all, str, colon, kw, num) => {
+          if (str) return colon ? `<span class="t-key">${str}</span><span class="t-punct">${colon}</span>` : `<span class="t-str">${str}</span>`;
+          if (kw) return `<span class="t-kw">${kw}</span>`;
+          return `<span class="t-num">${num}</span>`;
+        });
+      return `<span class="l">${h}</span>`;
+    }).join('');
+  }
+  function showCode(text, lang) {
+    state.lastOutput = text;
+    const lines = countLines(text);
+    if (text.length > 1.5e6 || lines > 40000) {
+      els.out.innerHTML = `<pre class="code plain">${esc(text)}</pre>`;
+    } else {
+      els.out.innerHTML = `<pre class="code">${lang === 'json' ? highlightJSON(text) : highlightYAML(text)}</pre>`;
+    }
+    els.outMeta.textContent = `${lines - (text.endsWith('\n') ? 1 : 0)} lines · ${fmtBytes(byteLen(text))}`;
+    $('btn-copy').disabled = false;
+  }
+  function showError(title, detail, frame, onJump) {
+    state.lastOutput = '';
+    els.out.innerHTML = `<div class="errbox"><h3>${esc(title)}</h3>${detail ? `<p>${esc(detail)}</p>` : ''}${frame ? `<pre>${esc(frame)}</pre>` : ''}${onJump ? '<button class="btn" id="btn-jump">Go to error</button>' : ''}</div>`;
+    if (onJump) $('btn-jump').onclick = onJump;
+    els.outMeta.textContent = '';
+    $('btn-copy').disabled = true;
+  }
+
+  // ---------- core run ----------
+  const parseOpts = () => ({ allowComments: state.input.lenient, allowTrailingCommas: state.input.lenient });
+  const schemaOpts = () => ({ draft: state.schema.draft, title: state.schema.title, required: state.schema.required, detectFormats: state.schema.detectFormats, additionalProperties: !state.schema.closed });
+
+  function parseInput(text) {
+    return state.input.multi ? J.parseMulti(text, parseOpts()) : [J.parse(text, parseOpts())];
+  }
+
+  function reportJsonError(e, ta, gut, label) {
+    setPill(els.stParse, 'bad', `${esc(label)}: line ${e.line}, col ${e.column} — ${esc(e.reason)} <button class="linkish" id="st-jump">go</button>`);
+    $('st-jump').onclick = () => jumpTo(ta, e.pos);
+    syncGutter(ta, gut, e.line);
+    showError(`Invalid ${label === 'Schema' ? 'schema JSON' : 'JSON'}`, `${e.reason} at line ${e.line}, column ${e.column}.`, J.codeFrame(ta.value, e.line, e.column), () => jumpTo(ta, e.pos));
+  }
+
+  function statsLine(docs, text) {
+    const st = docs.reduce((a, d) => { const s = J.stats(d); for (const k in s) a[k] = k === 'maxDepth' ? Math.max(a[k] || 0, s[k]) : (a[k] || 0) + s[k]; return a; }, {});
+    const parts = [];
+    if (docs.length !== 1) parts.push(`${docs.length} documents`);
+    parts.push(`${st.keys} keys`, `${st.arrays} arrays`, `depth ${st.maxDepth}`);
+    return parts.join(' · ');
+  }
+
+  function run() {
+    const text = els.input.value;
+    els.inMeta.textContent = text ? `${countLines(text)} lines · ${fmtBytes(byteLen(text))}` : '';
+    els.stRt.hidden = true;
+    els.stStats.textContent = '';
+    syncGutter(els.input, els.gutIn, 0);
+    syncGutter(els.schema, els.gutSchema, 0);
+    save();
+
+    if (!text.trim()) {
+      setPill(els.stParse, '', 'Waiting for input');
+      els.out.innerHTML = '';
+      els.outMeta.textContent = '';
+      state.lastOutput = '';
+      $('btn-copy').disabled = true;
+      return;
+    }
+
+    if (state.mode === 'convert' && state.dir === 'y2j') return runYamlToJson(text);
+
+    let docs;
+    try { docs = parseInput(text); } catch (e) {
+      if (e instanceof J.JSONParseError) return reportJsonError(e, els.input, els.gutIn, 'JSON');
+      throw e;
+    }
+    state.docs = docs;
+    setPill(els.stParse, 'ok', state.input.multi ? `Valid JSON · ${docs.length} document${docs.length === 1 ? '' : 's'}` : 'Valid JSON');
+    els.stStats.textContent = statsLine(docs, text);
+
+    if (state.mode === 'convert') {
+      const yaml = state.input.multi ? J.emitDocuments(docs, state.yaml) : J.emit(docs[0], state.yaml);
+      showCode(yaml, 'yaml');
+      verifyRoundTrip(yaml, docs);
+    } else if (state.mode === 'schema') {
+      const ast = J.inferSchemaAST(docs, schemaOpts());
+      if (state.schema.as === 'json') showCode(J.toJSON(ast, state.yaml.indent) + '\n', 'json');
+      else showCode(J.emit(ast, state.yaml), 'yaml');
+      setPill(els.stRt, '', `Schema inferred from ${docs.length} sample${docs.length === 1 ? '' : 's'}`);
+    } else {
+      runValidate(docs);
+    }
+  }
+
+  function verifyRoundTrip(yaml, docs) {
+    const jy = window.jsyaml;
+    if (!jy) { setPill(els.stRt, '', 'Round-trip check loading…'); return; }
+    if (yaml.length > 5e6) { setPill(els.stRt, '', 'Round-trip check skipped (large output)'); return; }
+    try {
+      const back = state.input.multi ? jy.loadAll(yaml) : [jy.load(yaml)];
+      const ok = back.length === docs.length && docs.every((d, i) => J.deepEqual(J.toJS(d), back[i]));
+      setPill(els.stRt, ok ? 'ok' : 'warn', ok ? 'Round-trip verified: js-yaml reads it back identically' : 'Round-trip differs (please report)');
+    } catch (e) {
+      setPill(els.stRt, 'bad', 'js-yaml could not read the output: ' + esc(e.message.split('\n')[0]));
+    }
+  }
+
+  function runYamlToJson(text) {
+    const jy = window.jsyaml;
+    if (!jy) {
+      setPill(els.stParse, 'warn', 'YAML parser (js-yaml) is still loading or unavailable');
+      showError('YAML → JSON needs js-yaml', 'The YAML parser loads from cdnjs. Check your connection and reload the page.');
+      return;
+    }
+    let docs;
+    try { docs = jy.loadAll(text); } catch (e) {
+      const mark = e.mark || {};
+      const line = (mark.line || 0) + 1, col = (mark.column || 0) + 1;
+      setPill(els.stParse, 'bad', `YAML: line ${line}, col ${col} — ${esc(e.reason || e.message)}`);
+      syncGutter(els.input, els.gutIn, line);
+      showError('Invalid YAML', `${e.reason || e.message} at line ${line}, column ${col}.`, J.codeFrame(text, line, col), () => jumpTo(els.input, mark.position || 0));
+      return;
+    }
+    docs = docs.filter((d) => d !== undefined);
+    const ind = state.yaml.indent;
+    let out;
+    const replacer = (k, v) => (v instanceof Date ? v.toISOString() : v);
+    if (state.input.multi) out = docs.map((d) => JSON.stringify(d, replacer)).join('\n') + '\n';
+    else out = JSON.stringify(docs.length === 1 ? docs[0] : docs, replacer, ind) + '\n';
+    setPill(els.stParse, 'ok', `Valid YAML · ${docs.length} document${docs.length === 1 ? '' : 's'}`);
+    showCode(out, 'json');
+  }
+
+  function parseSchemaText(t) {
+    try { return { value: J.toJS(J.parse(t, { allowComments: true, allowTrailingCommas: true })) }; } catch (jsonErr) {
+      const looksJson = /^\s*[{[]/.test(t);
+      if (window.jsyaml && !looksJson) {
+        try { return { value: window.jsyaml.load(t) }; } catch (yErr) {
+          return { error: { kind: 'yaml', e: yErr } };
+        }
+      }
+      return { error: { kind: 'json', e: jsonErr } };
+    }
+  }
+
+  function runValidate(docs) {
+    const t = els.schema.value;
+    if (!t.trim()) {
+      setPill(els.stRt, '', 'Add a schema to validate against');
+      showError('No schema yet', 'Paste a JSON Schema in the panel above (JSON or YAML), or press "Infer from input" to start from one generated from your data.');
+      return;
+    }
+    const parsed = parseSchemaText(t);
+    if (parsed.error) {
+      const { kind, e } = parsed.error;
+      if (kind === 'json' && e instanceof J.JSONParseError) return reportJsonError(e, els.schema, els.gutSchema, 'Schema');
+      const mark = e.mark || {};
+      const line = (mark.line || 0) + 1, col = (mark.column || 0) + 1;
+      setPill(els.stParse, 'bad', `Schema YAML: line ${line}, col ${col}`);
+      showError('Invalid schema YAML', `${e.reason || e.message} at line ${line}, column ${col}.`, J.codeFrame(t, line, col), () => jumpTo(els.schema, mark.position || 0));
+      return;
+    }
+    const schema = parsed.value;
+    let results;
+    try {
+      results = docs.map((d) => J.validate(J.toJS(d), schema));
+    } catch (e) {
+      if (e instanceof J.SchemaError) {
+        setPill(els.stRt, 'bad', 'Schema error');
+        showError('Schema error', e.message);
+        return;
+      }
+      throw e;
+    }
+    const failed = results.filter((r) => !r.valid).length;
+    const total = results.reduce((a, r) => a + r.total, 0);
+    state.lastOutput = results.map((r, i) => r.errors.map((e) => `${docs.length > 1 ? `[doc ${i + 1}] ` : ''}${e.path}: ${e.message} (${e.keyword})`).join('\n')).filter(Boolean).join('\n') || 'valid';
+    $('btn-copy').disabled = false;
+    let html = '<div class="results">';
+    if (!failed) {
+      html += `<div class="verdict ok"><span class="dot"></span>${docs.length > 1 ? `All ${docs.length} documents match` : 'The input matches'} the schema</div>`;
+    } else {
+      html += `<div class="verdict bad"><span class="dot"></span>${total} problem${total === 1 ? '' : 's'}${docs.length > 1 ? ` in ${failed} of ${docs.length} documents` : ''}</div>`;
+    }
+    results.forEach((r, di) => {
+      if (r.valid) return;
+      if (docs.length > 1) html += `<div class="doc-label">Document ${di + 1}</div>`;
+      r.errors.forEach((e, ei) => {
+        html += `<button class="issue" data-doc="${di}" data-path="${esc(e.path)}"><code>${esc(e.path)}</code><span class="msg">${esc(e.message)}</span><span class="kw">${esc(e.keyword)}</span></button>`;
+      });
+      if (r.total > r.errors.length) html += `<div class="doc-label">…and ${r.total - r.errors.length} more</div>`;
+    });
+    html += '</div>';
+    els.out.innerHTML = html;
+    els.outMeta.textContent = failed ? `${total} error${total === 1 ? '' : 's'}` : 'valid';
+    setPill(els.stRt, failed ? 'bad' : 'ok', failed ? 'Does not match schema' : 'Matches schema');
+    els.out.querySelectorAll('.issue').forEach((b) => {
+      b.onclick = () => {
+        const d = state.docs[+b.dataset.doc];
+        const hit = J.nodeAt(d, b.dataset.path);
+        jumpTo(els.input, hit.pos);
+      };
+    });
+  }
+
+  // ---------- UI wiring ----------
+  function applyModeUI() {
+    document.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode)));
+    document.querySelectorAll('[data-dir]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.dir === state.dir)));
+    const convert = state.mode === 'convert';
+    const y2j = convert && state.dir === 'y2j';
+    $('g-dir').hidden = !convert;
+    $('g-schema').hidden = state.mode !== 'schema';
+    $('sep-schema').hidden = state.mode !== 'schema';
+    els.paneSchema.hidden = state.mode !== 'validate';
+    els.right.style.gridTemplateRows = state.mode === 'validate' ? '' : '1fr';
+    $('g-yaml').hidden = state.mode === 'validate';
+    $('sep-in').hidden = state.mode === 'validate';
+    document.querySelectorAll('#g-yaml [data-y]').forEach((l) => { l.hidden = y2j; });
+    els.inTitle.textContent = y2j ? 'YAML input' : 'JSON input';
+    els.input.placeholder = y2j ? 'Paste YAML here, drop a file, or press Sample' : 'Paste JSON here, drop a file, or press Sample';
+    $('btn-format').hidden = y2j;
+    els.outTitle.textContent = state.mode === 'validate' ? 'Validation result' : state.mode === 'schema' ? 'Inferred JSON Schema' : y2j ? 'JSON output' : 'YAML output';
+    $('btn-copy').textContent = state.mode === 'validate' ? 'Copy report' : 'Copy';
+  }
+
+  document.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => { state.mode = b.dataset.mode; applyModeUI(); run(); }));
+  document.querySelectorAll('[data-dir]').forEach((b) => b.addEventListener('click', () => {
+    if (state.dir === b.dataset.dir) return;
+    // Carry the current output over as the new input when switching direction.
+    if (state.lastOutput && state.mode === 'convert') els.input.value = state.lastOutput;
+    state.dir = b.dataset.dir; applyModeUI(); run();
+  }));
+
+  // options
+  document.querySelectorAll('[data-opt]').forEach((el) => {
+    const k = el.dataset.opt;
+    const target = k in state.input ? state.input : state.yaml;
+    if (el.type === 'checkbox') el.checked = !!target[k]; else el.value = String(target[k]);
+    el.addEventListener('change', () => {
+      target[k] = el.type === 'checkbox' ? el.checked : (k === 'quoteStyle' ? el.value : Number(el.value));
+      run();
+    });
+  });
+  document.querySelectorAll('[data-sopt]').forEach((el) => {
+    const k = el.dataset.sopt;
+    if (el.type === 'checkbox') el.checked = !!state.schema[k]; else el.value = String(state.schema[k]);
+    el.addEventListener(el.type === 'text' ? 'input' : 'change', () => {
+      state.schema[k] = el.type === 'checkbox' ? el.checked : el.value;
+      run();
+    });
+  });
+
+  let timer;
+  const schedule = () => {
+    clearTimeout(timer);
+    const delay = els.input.value.length + els.schema.value.length > 3e5 ? 350 : 60;
+    timer = setTimeout(run, delay);
+  };
+  els.input.addEventListener('input', () => { syncGutter(els.input, els.gutIn, 0); schedule(); });
+  els.schema.addEventListener('input', () => { syncGutter(els.schema, els.gutSchema, 0); schedule(); });
+
+  $('btn-sample').onclick = () => {
+    if (state.mode === 'convert' && state.dir === 'y2j') {
+      els.input.value = J.emit(J.parse(SAMPLE));
+    } else if (state.input.multi) {
+      els.input.value = [
+        { event: 'signup', user: 'u_1', at: '2026-11-20T10:00:00Z', plan: 'free' },
+        { event: 'upgrade', user: 'u_1', at: '2026-11-21T08:12:44Z', plan: 'pro', seats: 5 },
+        { event: 'signup', user: 'u_2', at: '2026-11-22T17:03:09Z', plan: 'free', referrer: 'https://example.com/blog' },
+      ].map((x) => JSON.stringify(x)).join('\n');
+    } else {
+      els.input.value = SAMPLE;
+    }
+    run();
+  };
+  $('btn-format').onclick = () => {
+    try {
+      const docs = parseInput(els.input.value);
+      els.input.value = state.input.multi ? docs.map((d) => J.toJSON(d, 0)).join('\n') : J.toJSON(docs[0], state.yaml.indent);
+      run();
+      toast('Formatted');
+    } catch (e) { run(); toast('Fix the JSON error first'); }
+  };
+  $('btn-clear').onclick = () => { els.input.value = ''; run(); els.input.focus(); };
+  $('btn-copy').onclick = async () => {
+    const text = state.lastOutput;
+    if (!text) return;
+    try { await navigator.clipboard.writeText(text); toast('Copied to clipboard'); } catch (_) {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (__) {}
+      ta.remove();
+      toast(ok ? 'Copied to clipboard' : 'Copy blocked — select the output and copy manually');
+    }
+  };
+  $('btn-use-inferred').onclick = () => {
+    try {
+      const docs = parseInput(els.input.value);
+      els.schema.value = J.toJSON(J.inferSchemaAST(docs, schemaOpts()), 2);
+      run();
+      toast('Schema inferred from input');
+    } catch (e) { toast('Fix the input JSON first'); }
+  };
+
+  function readFileInto(file, ta) {
+    if (!file) return;
+    if (file.size > 50 * 1048576) { toast('File is larger than 50 MB'); return; }
+    const r = new FileReader();
+    r.onload = () => {
+      ta.value = String(r.result);
+      if (ta === els.input && /\.(ndjson|jsonl)$/i.test(file.name) && !state.input.multi) {
+        state.input.multi = true; document.querySelector('[data-opt="multi"]').checked = true;
+      }
+      if (ta === els.input && /\.(ya?ml)$/i.test(file.name) && state.mode === 'convert' && state.dir !== 'y2j') {
+        state.dir = 'y2j'; applyModeUI();
+      }
+      run();
+      toast(`Loaded ${file.name}`);
+    };
+    r.onerror = () => toast('Could not read the file');
+    r.readAsText(file);
+  }
+  $('btn-open').onclick = () => $('file').click();
+  $('file').onchange = (e) => { readFileInto(e.target.files[0], els.input); e.target.value = ''; };
+  $('btn-open-schema').onclick = () => $('file-schema').click();
+  $('file-schema').onchange = (e) => { readFileInto(e.target.files[0], els.schema); e.target.value = ''; };
+  for (const [ed, ta] of [[$('ed-in'), els.input], [$('ed-schema'), els.schema]]) {
+    ed.addEventListener('dragover', (e) => { e.preventDefault(); ed.classList.add('drag'); });
+    ed.addEventListener('dragleave', () => ed.classList.remove('drag'));
+    ed.addEventListener('drop', (e) => {
+      e.preventDefault(); ed.classList.remove('drag');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) readFileInto(e.dataTransfer.files[0], ta);
+    });
+  }
+
+  // js-yaml loads asynchronously; re-run when it arrives so the round-trip badge appears.
+  const jyScript = $('jsyaml-script');
+  jyScript.addEventListener('load', () => run());
+  jyScript.addEventListener('error', () => {
+    $('dir-y2j').disabled = true;
+    $('dir-y2j').title = 'Unavailable: js-yaml could not be loaded';
+    if (state.dir === 'y2j') { state.dir = 'j2y'; applyModeUI(); }
+    run();
+    setPill(els.stRt, '', 'Round-trip check unavailable offline');
+  });
+
+  applyModeUI();
+  run();
+})();
+</script>
+</body>
+</html>

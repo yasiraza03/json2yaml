@@ -1,12 +1,16 @@
 # jsonyaml: JSON → YAML converter, schema inference and validation
 
+[![Live demo](https://img.shields.io/badge/Live%20demo-Open%20the%20web%20app-2ea44f?style=for-the-badge)](https://yasiraza03.github.io/json2yaml/)
+
+**Try it in your browser: <https://yasiraza03.github.io/json2yaml/>**
+
 A JSON → YAML toolkit with no runtime dependencies. It includes:
 
 - **a strict JSON parser.** Errors give the exact line and column, with a code frame. Key order is kept exactly, and the original number text is kept, so `1.10` and `12345678901234567890` survive unchanged.
 - **a YAML emitter.** The output reads the same in YAML 1.2 and YAML 1.1 parsers: strings like `yes`, `no`, `on`, `1.0`, `0x1F`, `12:30`, `2024-01-01`, `~` and `null` are quoted automatically, multi-line strings become `|` blocks, and control characters are escaped.
 - **JSON Schema inference** from one or many samples (drafts 2020-12, 2019-09, 07, 06 and 04). It detects formats (date-time, date, time, email, uri, uuid, ipv4) and finds which fields are required.
 - **a JSON Schema validator.** It supports type, enum, const, the numeric and string limits, pattern, format, `items`/`prefixItems`, contains, `uniqueItems`, properties/`patternProperties`/`additionalProperties`, required, `propertyNames`, `dependentRequired`/`dependentSchemas`/`dependencies`, `allOf`/`anyOf`/`oneOf`/`not`, `if`/`then`/`else` and local `$ref`/`$defs`. Errors are reported as JSON Pointer paths.
-- **three ways to use it:** a CLI (`bin/json2yaml.js`), a library (`src/jsonyaml.js`, a UMD module for Node and browsers) and a self-contained web app (`web/index.html`).
+- **three ways to use it:** a CLI (`bin/json2yaml.js`), a library (`src/jsonyaml.js`, a UMD module for Node and browsers) and a self-contained [web app](https://yasiraza03.github.io/json2yaml/) (`web/index.html`).
 
 ## CLI
 
@@ -59,7 +63,7 @@ J.nodeAt(ast, '/users/0/email');                   // → { node, pos }: map an 
 
 ## Web app
 
-Open `web/index.html` in a browser. It is a single file built from `web/template.html` with `npm run build:web`. It has three modes:
+Use it online at **<https://yasiraza03.github.io/json2yaml/>**, or open `web/index.html` in a browser. It is a single file built from `web/template.html` with `npm run build:web`. It has three modes:
 
 - **Convert:** JSON → YAML with every option, or YAML → JSON. A live check confirms the output parses back to identical data.
 - **Infer schema:** shows the inferred schema as YAML or JSON.

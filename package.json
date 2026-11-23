@@ -2,6 +2,7 @@
   "name": "jsonyaml",
   "version": "1.0.0",
   "description": "Zero-dependency JSON to YAML converter with JSON Schema inference and validation (CLI, library and web app).",
+  "homepage": "https://yasiraza03.github.io/json2yaml/",
   "main": "src/jsonyaml.js",
   "bin": {
     "json2yaml": "bin/json2yaml.js"
